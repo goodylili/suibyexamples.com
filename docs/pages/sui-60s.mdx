@@ -1,0 +1,29 @@
+# Sui & Move Overview
+
+Move is the secure and resource-oriented programming language  for building on the Sui blockchain.
+
+It’s designed to manage digital assets safely and efficiently, giving developers fine-grained control over how assets are created, transferred, and stored.
+
+Originally developed by Meta for Diem, Move was adopted and evolved by Mysten Labs to power Sui, a high-performance Layer 1 blockchain built for speed, scalability, and smart contract safety.
+
+Unlike traditional programming languages that treat data like generic variables, Move introduces a new concept: ***resources***. In Move, resources are first-class citizens; they can’t be copied or accidentally dropped.
+
+This is cool because assets like NFTs or tokens are handled with cryptographic-level safety.
+
+Instead of garbage collection or manual memory management, Move uses *ownership* and *move semantics*. Each value in Move has exactly one owner at a time, and when that value is moved, the original reference becomes invalid.
+
+This avoids double-spends and dangling references—two common bugs in smart contract development.
+
+## Sui Move Extends on Move
+
+Sui Move extends the core Move language with new features like object-centric programming. On Sui, everything is treated as an object with a unique ID—a coin, a smart contract, or a game item.
+
+These objects live on-chain and can be passed between users, upgraded, or mutated using Move functions called *entry functions*.
+
+To get started with Sui Move, install the Sui CLI and initialize a new project with `sui move new`. Write your modules in `.move` files and define structs, functions, and resources.
+
+Use the `entry` keyword to declare public entry points for your smart contracts. Then compile your code with `sui move build` and test it locally before deploying.
+
+Sui Move has a powerful standard library and frameworks for handling complex operations, from capability-based access control to programmable transactions.
+
+You’re ready to  build a secure, asset-centric smart contract on one of the fastest blockchains. That’s Sui Move in 100 seconds.

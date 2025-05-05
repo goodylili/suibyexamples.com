@@ -1,0 +1,85 @@
+# Introduction to Sui Move
+
+Even as a developer with experience writing smart contracts with Rust and Solidity, I initially experienced some overhead trying to understand and express myself with Move.
+
+This is the first article in my Sui Move series. I promise to set you up for success with everything you need to start building on the Sui blockchain as soon as possible.
+
+## Getting Started With Sui Move
+
+You don’t need development experience to start writing smart contracts. Move is a language with its primitives, so you’ll need some expertise here. Sui Move is the JavaScript of Web3.
+
+To remain language-agnostic, we’ll use the Sui-CLI tool to interact with the smart contracts we build in this series.
+
+Depending on the operating system and package manager you’re using, here’s how you can install Sui CLI on your computer:
+
+Execute this command to install Sui CLI on your terminal if you’re running a Unix-based operating system (macOS or Linux) via [Homebrew](https://brew.sh/).
+
+```bash [Terminal]
+brew install sui
+```
+
+Execute this command to install Sui CLI on your terminal if you’re running Windows via [Chocolatey](https://chocolatey.org/).
+
+```bash [Command Line]
+choco install sui
+```
+
+Do you have any of these package managers? You should get one. The overhead is less than taking [the Rust route](https://docs.sui.io/guides/developer/getting-started/sui-install#install-sui-binaries-from-source), and you’ll likely use one of these package managers in the future.
+
+After installing the Sui CLI client, execute this command to verify your installation.
+
+```bash [Terminal]
+sui --version
+
+# output: sui 1.40.1-homebrew
+```
+
+The command should output the version of Sui CLI you’ve installed and the installation source.
+
+Next, you’ll need an IDE to write smart contracts easily and on the fly. Considering it’s 2025, I advise downloading [Cursor](http://cursor.com) or [VSCode](https://www.notion.so/2025-The-Goodylili-Brand-165e61ac3cdb807298f9ecdbba5776f6?pvs=21) and getting an extension with AI capabilities.
+
+Unfortunately, I won’t recommend IntelliJ IDEs, although they’re my most used; there’s hardly comprehensive support for Move as much as you’ll get using VSCode, but the option is still open.
+
+
+## Useful Sui Development Resources
+
+I need you to be successful. There needs to be more of us, so I must point you to the right resources so that you can augment your learning and borrow more perspective.
+
+The most useful resources for reference are the [Sui Move documentation](https://docs.sui.io/concepts/sui-move-concepts) and the [Move Book](https://move-book.com/). Both are from Mysten Labs, and they were very useful in my journey.
+
+
+It’s the age of AI, you’ll probably be using it to make your work faster. I found the AI integration in the official Sui documentation helpful, followed by DeepSeek, Claude, and OpenAI’s models in that order.
+
+### **Sui Tears**
+
+Sui Tears by Interest Protocol is a collection of open-source, ready-to-use smart contracts for multiple real-world use cases, including airdrops, DeFi, Governance, etc.
+
+[Sui Tears 💧 | Interest Protocol](https://docs.interestprotocol.com/overview/deprecated/sui-tears)
+
+### **Mysten Labs’ Sui Examples**
+
+Mysten Labs also has an examples/ directory stacked with practical applications for Sui that you should check out. The examples don’t stop at smart contracts; there are also client-facing integrations.
+
+[sui/examples at main · MystenLabs/sui](https://github.com/MystenLabs/sui/tree/main/examples)
+
+### **Awesome Move**
+
+Awesome Move is a collection of code and content from the Move community. Regardless of your learning style, you’ll find everything necessary to succeed as a Move developer here.
+
+[GitHub - MystenLabs/awesome-move: Code and content from the Move community.](https://github.com/MystenLabs/awesome-move?tab=readme-ov-file#videos)
+
+### **Everybody’s Codebase**
+
+![image.png](attachment:be0af863-0957-43c0-bfe0-76849122a87f:image.png)
+
+You can [search GitHub](https://docs.github.com/en/search-github/github-code-search/understanding-github-code-search-syntax) for Move codebases and check out what Move devs are cooking. On the Github Search bar, use `language:Move`  and further filter to narrow results based on what you’re searching for3
+
+### The Move Package Registry
+
+The Move Registry is the npm.js alternative for Sui Move projects. It is a place to share and discover Move packages.
+
+[Move Package Registry](https://www.moveregistry.com/)
+
+## Conclusion
+
+This was an intro article to set you up with tools and resources. Check out the following article to learn how to use the Sui CLI. I’ve outlined the most useful commands so you can use them as a cheat sheet.

@@ -37,8 +37,9 @@ const topNav = [
     },
     {
         text: "GitHub",
-        link: "https://movementlabs.xyz",
+        link: "https://github.com/goodylili",
     },
 ]
 
 export default topNav;
+
