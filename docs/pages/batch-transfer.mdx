@@ -1,0 +1,123 @@
+# Airdrop Package on Sui
+
+
+Airdrop/batch send smart contracts are a great way to consolidate knowledge after learning a new programming language.
+
+The aim is simple: Instead of sending to multiple recipients in multiple transactions that use a lot of gas, you can send everything with one function and pay gas once. It’s all about saving fees in one clean transaction.
+
+## Building an Airdrop Package
+
+First, you’ll need to create the project if you don’t have one already.
+
+You know the drill; execute this command and open your project in your IDE of choice.
+
+```bash [Terminal]
+sui move new airdrop
+cd airdrop
+```
+
+Now, declare the module like this:
+
+```move [sui.move]
+module airdrop::mass_send;
+```
+
+These are the imports you’ll need. The `Coin` module for working with coins and the `event` module for emitting events.
+
+```move [sui.move]
+use sui::coin::{Self, Coin};
+use sui::event;
+```
+
+Now, define your event struct like this:
+
+```move [sui.move]
+public struct AirdropEvent has copy, drop {
+    amount: u64,
+    recipient: address,
+}
+```
+
+You can optionally define custom error codes. In this case, we need to make sure the lengths or the vectors match:
+
+```move [sui.move]
+const E_LENGTH_MISMATCH: u64 = 0;
+```
+
+Here's the main function signature. It takes a coin, a list of recipient addresses, and the amounts each one should receive.
+
+```move [sui.move]
+public entry fun send_by_allocation<T: store>(
+    coin: &mut Coin<T>,
+    recipients: vector<address>,
+    amounts: vector<u64>,
+    ctx: &mut TxContext
+)
+```
+
+Now, we can compare the lengths of the recipient vectors and amounts to ensure that every recipient has an allocation.
+
+```move [sui.move]
+let num_recipients = vector::length(&recipients);
+let num_amounts = vector::length(&amounts);
+assert!(num_recipients == num_amounts, E_LENGTH_MISMATCH);
+```
+
+The final piece in the puzzle is to use a loop to transfer tokens to all the recipients with the `public_transfer` function.
+
+```move [sui.move]
+let mut i = 0;
+while (i < num_recipients) {
+   let amount = *vector::borrow(&amounts, i);
+   let recipient = *vector::borrow(&recipients, i);
+   let portion = coin::split(coin, amount, ctx);
+   transfer::public_transfer(portion, recipient);
+
+
+   event::emit(AirdropEvent {
+            amount,
+            recipient,
+        });
+
+                i = i + 1;
+    };
+}
+```
+
+In the loop, you split the coin into the amount allocated for the specific recipient before sending it. Every transfer emits an event.
+
+Best part? It’s all one transaction. One gas fee.
+
+Now build the project for some house keeping. Everything should work fine.
+
+```move [sui.move]
+sui move build
+```
+
+Once it builds successfully, you can publish to the Sui network with this command.
+
+```move [sui.move]
+sui client publish --gas-budget 100000000
+```
+
+Once you’ve published you can call the function via Sui CLI like this to airdrop to multiple recipients:
+
+```bash [Terminal]
+sui client call \
+  --package <YOUR_PACKAGE_ID> \
+  --module mass_send \
+  --function send_by_allocation \
+  --args <COIN_OBJECT_ID> \
+         '[<RECIPIENT_1>, <RECIPIENT_2>, ...]' \
+         '[<AMOUNT_1>, <AMOUNT_2>, ...]' \
+  --type-args <TOKEN_TYPE> \
+  --gas-budget 10000000
+```
+
+Replace the arguments with actual values and you’re good to go. Your recipients should recieve the coins you specify.
+
+## Conclusion
+
+You’ve learned to execute an airdrop without spending so much on gas. Sui’s object-centric model and parallel execution engine make this kind of flow not just possible, but *natural*.
+
+With a single transaction, you can send tokens to dozens (or hundreds) of recipients; there is no need for multiple calls or gas fees.

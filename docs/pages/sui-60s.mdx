@@ -1,12 +1,34 @@
 # Sui & Move Overview
 
-Move is the secure and resource-oriented programming language  for building on the Sui blockchain.
 
-It’s designed to manage digital assets safely and efficiently, giving developers fine-grained control over how assets are created, transferred, and stored.
+Move is the secure and resource-oriented programming language  for building on the Sui blockchain. It’s designed to manage digital assets safely and efficiently, giving developers fine-grained control over how assets are created, transferred, and stored.
+
+<iframe width="100%" height="350" src="https://www.youtube.com/embed/ItHXDdyZ_s0"
+        title="Sui Blockchain vs Traditional Blockchain" frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 Originally developed by Meta for Diem, Move was adopted and evolved by Mysten Labs to power Sui, a high-performance Layer 1 blockchain built for speed, scalability, and smart contract safety.
 
 Unlike traditional programming languages that treat data like generic variables, Move introduces a new concept: ***resources***. In Move, resources are first-class citizens; they can’t be copied or accidentally dropped.
+
+```move [vanilla.move]
+module 0x0::TokenExample {
+    use std::signer;
+
+    struct Token has key {
+        value: u64
+    }
+
+    public fun create(account: &signer, amount: u64) {
+        move_to(account, Token { value: amount });
+    }
+
+    public fun get_value(addr: address): u64 acquires Token {
+        borrow_global<Token>(addr).value
+    }
+}
+```
 
 This is cool because assets like NFTs or tokens are handled with cryptographic-level safety.
 
@@ -16,13 +38,40 @@ This avoids double-spends and dangling references—two common bugs in smart con
 
 ## Sui Move Extends on Move
 
-Sui Move extends the core Move language with new features like object-centric programming. On Sui, everything is treated as an object with a unique ID—a coin, a smart contract, or a game item.
+<img src="/move-evolution.png" alt="Move Evolution"/>
 
-These objects live on-chain and can be passed between users, upgraded, or mutated using Move functions called *entry functions*.
 
+Sui Move is a variant of Move (different from the original version). Sui Move extends the core Move language with new features like object-centric programming.
+
+On Sui, everything is treated as an object with a unique ID—a coin, a smart contract, or a game item. These objects live on-chain and can be passed between users, upgraded, or mutated using Move functions called *entry functions*.
+
+
+
+```move [sui.move]
+module sui_example::token {
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
+
+    struct Token has key, store {
+        id: UID,
+        value: u64
+    }
+
+    public entry fun create(value: u64, ctx: &mut TxContext) {
+        let token = Token {
+            id: object::new(ctx),
+            value
+        };
+        transfer::public_transfer(token, tx_context::sender(ctx));
+    }
+}
+```
 To get started with Sui Move, install the Sui CLI and initialize a new project with `sui move new`. Write your modules in `.move` files and define structs, functions, and resources.
 
 Use the `entry` keyword to declare public entry points for your smart contracts. Then compile your code with `sui move build` and test it locally before deploying.
+
+
 
 Sui Move has a powerful standard library and frameworks for handling complex operations, from capability-based access control to programmable transactions.
 

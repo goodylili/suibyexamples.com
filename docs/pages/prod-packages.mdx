@@ -1,0 +1,221 @@
+# Beyond the Basics of Move
+
+Once you understand the basics of Move programming, you can move on to Sui development. This article is a sequel to the Sui Move in 15 minutes article.
+
+In this article, you’ll learn the ergonomic aspects of Sui Move to write and publish production-ready smart contracts.
+
+## **Transaction Context**
+
+You can access the input arguments and the transaction context when anybody sends transactions to your contracts.
+
+You can use the context to fetch *who called it*, *when*, and *what’s happening*. That context is passed into your functions as `&mut TxContext`.
+
+```move [sui.move]
+public entry fun do_something(ctx: &mut TxContext) {
+    // use ctx here
+}
+```
+
+Here’s what you can access from the transaction context:
+
+```move [sui.move]
+struct TxContext has drop {
+    sender: address,             // who signed the transaction
+    tx_hash: vector<u8>,         // transaction hash
+    epoch: u64,                  // current epoch number
+    epoch_timestamp_ms: u64,     // epoch start timestamp (ms)
+    ids_created: u64             // how many new IDs created during this tx
+}
+```
+
+You never set these manually. Sui fills them in when the transaction runs.
+
+You’d often need to query what address is sending a transaction. Here’s how you can do that:
+
+```move [sui.move]
+public entry fun mint(ctx: &mut TxContext) {
+    let owner = tx_context::sender(ctx);
+}
+```
+
+Now you can access the sender’s address via the `owner` variable.
+
+## Module Initializers
+
+You’d need a module initializer to execute actions once e.g create a pool or assign special abilities.
+
+You’d declare an `init` function in the module, which runs automatically once published.
+
+```move [sui.move]
+fun init(ctx: &mut TxContext) { /* setup code here */ }
+```
+
+Your initializer function must be named `init`, private, return nothing, and optionally take in a one-time witness.
+
+```move [sui.move]
+fun init(otw: OTW, ctx: &mut TxContext) {
+
+ }
+```
+
+Here’s an `init` function with a one-time witness:
+
+```move [sui.move]
+fun init(otw: OTW, ctx: &mut TxContext) { /* with one-time witness */ }
+
+```
+
+Now, you need to understand witnesses and one-time witnesses.
+
+## **Capabilities**
+
+Capabilities are objects that give rights and resource access. No need for risky `if sender == admin` conditionals. If you’ve got the cap, you’re allowed.
+
+Here’s an example of a struct with capabilities.
+
+```move [sui.move]
+public struct AdminCap has key, store { id: UID }
+```
+
+> The convention is adding `Cap` as a suffix with the CamelCase.You typically mint the capability once, right when the module is published with a module initializer:
+
+```move [sui.move]
+fun init(ctx: &mut TxContext) {
+    transfer::transfer(
+        AdminCap { id: object::new(ctx) },
+        ctx.sender()
+    );
+}
+```
+
+The publisher receives the cap and becomes the admin. From there, they can set up the system or delegate the capability.
+
+The `init` function doesn’t stop someone from adding a new function that creates another cap later. Consider using a One-Time Witness or an un-upgradable package to enforce true one-time access.
+
+## **Witnesses**
+
+Capabilities are great for managing access, but what if you need *one-time* access to perform something sensitive, like initializing a global config, or minting a single admin cap that must *never* be duplicated? That’s where **witnesses** come in.
+
+A **witness** is a proof object passed into a function to prove that something happened before or didn’t happen.
+
+### **One-Time Witness**
+
+The `One-Time Witness (OTW)` pattern enforces that certain code can only run once. It is perfect for ensuring that only one capability is created or that something can only be initialized during the first and only setup phase.
+
+```move [sui.move]
+fun init(otw: OTW, ctx: &mut TxContext) {
+    // only runs during publish
+    transfer::transfer(AdminCap { id: object::new(ctx) }, ctx.sender());
+}
+```
+
+Sui provides the OTW during the `publish` phase. If you try calling the function again later, there will be no witness and no dice.
+
+
+:::info
+Use OTW when you need strict one-time-only logic baked into your module.
+:::
+
+## Time Management on Sui
+Blockchains use epochs to track time deterministically and Sui is no different.
+
+You can access epoch-related info from the transaction context:
+
+```move [sui.move]
+let current_epoch = tx_context::epoch(ctx);
+let epoch_start_time = tx_context::epoch_timestamp_ms(ctx);
+```
+
+You can also use the `Clock` module for For millisecond-level accuracy.
+
+```move [sui.move]
+struct Clock has key {
+    id: UID,
+    timestamp_ms: u64, // current time in milliseconds
+}
+```
+
+First, you’ll have to import it from the `sui` library:
+
+```move [sui.move]
+use sui::clock::Clock;
+```
+
+You need to passed in `Clock`  as an immutable reference; then you can access the timestamp like this:
+
+```move [sui.move]
+use sui::clock::Clock;
+
+public fun current_time(clock: &Clock) {
+    let time = clock.timestamp_ms();
+    // ...
+}
+```
+
+You can build delayed token unlocks, time-limited auctions, expiring resources, etc.
+
+## Events
+
+You can emit events and listen to them to log specific data as they happen on-chain.
+
+How? You’ll define your own event structs, then use the built-in `event::emit` function.
+
+First, import the `event` module like this:
+
+```move [sui.move]
+use sui::event;
+```
+
+Now, you can emit events over your structs.
+
+```move [sui.move]
+public struct UserCreated has copy, drop {
+    user_id: address,
+}
+
+event::emit(UserCreated { user_id });
+```
+
+Events are off-chain observable. They don’t change state but are crucial for tracking contract activity and triggering app-side logic.
+
+## Error Handling
+
+You’re going to run into errors, and you’ll need to handle them. By default, when your Move function hits an abort!, it fails the transaction and returns a mod*ule name + error code. That’s helpful—until it isn’t*.
+
+```move [sui.move]
+public fun do_something() {
+    let field_1 = module_b::get_field(1); // may abort with 0
+    let field_2 = module_b::get_field(2); // may abort with 0
+    let field_3 = module_b::get_field(3); // may abort with 0
+}
+```
+
+If one of those calls fails with abort code `0`, you have **no idea** which one did it. That’s where better error-handling patterns come in.
+
+Instead of letting a function fail blindly, wrap it with checks. Constants come in handy here.
+
+First, define a constant for each error case:
+
+```move [sui.move]
+const E_NO_FIELD_A: u64 = 0;
+const E_NO_FIELD_B: u64 = 1;
+const E_NO_FIELD_C: u64 = 2;
+```
+
+Now you can add them to your assertions to narrow by your  error code:
+
+```move [sui.move]
+public fun assert_is_admin() {
+    assert!(is_admin(), ENotAuthorized);
+}
+```
+
+In this case, when the assertion fails, you know exactly what happened based on the error constants you defined:
+
+
+
+## Conclusion
+
+You’ve learned the Sui development-specific features to start building and deploying packages on chain.
+
+Next, launch a coin for your first project so everything makes sense and you can use what you’ve learned.

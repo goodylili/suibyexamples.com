@@ -23,7 +23,7 @@ export default defineConfig({
     },
 
 
-    logoUrl: {light: "/dark.svg", dark: "/yellow.svg"},
+    logoUrl: {light: "/14.png", dark: "/15.png"},
 
 
     sidebar,

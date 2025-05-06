@@ -1,0 +1,172 @@
+# Create and Deploy Coins on Sui
+
+Tokens are the most trendy thing to do on-chain. Of course, you have launch pads like Movepump, DoubleUp, and all the others that allow you to create tokens and deploy them with zero code, but you can only go so far with them.
+
+For more ergonomics and options, you’d need to create your tokens from scratch. This article will teach you how tokens are represented on Sui and how to launch tokens and make them tradable.
+
+
+
+## Getting Started: Launching and Deploying Tokens
+
+This article assumes you understand Sui Move and have already installed your development environment with an IDE and Sui CLI. If you don’t,  check out the first article to get set up.
+
+You’ll also need a Sui wallet. We’d be launching the token on the Sui mainnet so that you can trade it in real time across DEXs. You can deploy to any DEX, but in this case, we’d deploy to Aftermath (because it’s my favourite)
+
+## Sui’s Token Model
+
+Unlike other chains with a global key-value store or account-bound balances, Everything on Sui is an object.
+
+That design choice changes how you think about assets. It also gives you much more flexibility. Let’s marinate your point of view before launching tokens.
+
+On Sui, a token is just a `struct` defined in a package, wrapped with the `Coin<T>` type.
+
+```move [sui.move]
+struct MyToken has store {}
+```
+
+Once you declare it and register it on-chain, it becomes a usable coin type. Every `Coin<MyToken>` instance is an **object** on-chain with its own unique ID.
+
+Unlike traditional token standards (like ERC-20) that just keep balances, here every token is an *actual owned resource*.
+
+When a user holds 1000 `MyToken`, they’re not holding a “balance”—they have one or more `Coin<MyToken>` objects totalling 1000 units.
+
+You can merge, split, burn, or send them—because they’re owned objects, not just numbers in a map.
+
+### Token Treasury and Metadata
+
+When you create a token, you’d use a treasury cap pattern to control token minting (the right to mint more tokens into the supply)/
+
+When you create a token, you generate a `(TreasuryCap<T>, Metadata)` tuple:
+
+```move [sui.move]
+let (treasury_cap, metadata) = coin=::create_currency<MyToken>(...);
+```
+
+Only the treasury cap holder can mint new tokens. You can transfer it to another wallet or lock it in a contract.
+
+No more tokens can ever be minted if it's lost or burned. This gives you fine-grained control over token economics and lifecycle.
+
+Sui separates token **logic** from **metadata: t**he display name, symbol, description, and image URL are stored in a separate `Object` of type `Metadata`.
+
+```move [sui.move]
+Metadata {
+  name: b"MyToken",
+  symbol: b"MTK",
+  description: b"A very serious token",
+  icon_url: b"https://example.com/logo.png"
+}
+```
+
+And since metadata is tied to the **type**, not individual objects, all `Coin<MyToken>` instances share the same metadata.
+
+Now that you understand the mechanics of Sui tokens, let’s create one immediately.
+
+## Creating a token on Sui
+
+First, set up your project if you haven’t done that already:
+
+```move [sui.move]
+sui move new goodylili
+cd goodylili
+code .
+```
+
+You’ll get a `sources/` folder and `Move.toml`. This is your token package.
+
+```move [sui.move]
+module impatient::goodylili;
+
+use sui::coin::{Self, TreasuryCap};
+use sui::url;
+```
+
+Now import these packages. You’ll use the `TreasuryCap` to manage the token's treasury cap and the URL package to add an image to the token.
+
+Now, create a coin instance like this:
+
+```move [sui.move]
+public struct GOODYLILI has drop {}
+```
+
+Your init function will take in the witness and transaction context and create a token with the `coin::create_currency` function.
+
+```move [sui.move]
+fun init(witness: GOODYLILI, ctx: &mut TxContext) {
+    // Create the icon URL
+    let icon_url = url::new_unsafe_from_bytes(b"https://framerusercontent.com/images/0KKocValgAmB9XHzcFI6tALxGGQ.jpg");
+    let decimals: u8 = 8;
+
+    // Fixed multiplier for 8 decimals (10^8)
+    let multiplier = 100000000; // 10^8
+
+    // Create the currency - make treasury mutable
+    let (mut treasury, metadata) = coin::create_currency(
+        witness,
+        decimals,
+        b"GOODYLILI",
+        b"GOODYLILI ON SUI",
+        b"Goodylili Taught Sui. Here's proof",
+        option::some(icon_url),
+        ctx,
+    );
+
+    // Mint 300 tokens (300 * 10^8 base units)
+    let initial_coins = coin::mint(&mut treasury, 300 * multiplier, ctx);
+    transfer::public_transfer(initial_coins, tx_context::sender(ctx));
+
+    transfer::public_freeze_object(metadata);
+    transfer::public_transfer(treasury, tx_context::sender(ctx));
+}
+```
+
+We’re minting and transferring some coins from the treasury to provide liquidity on Aftermath later. Why freeze the `metadata`? So that it’s not modifiable.
+
+You’d need to mint tokens duly, so it’s best to have a separate function you can call for that.
+
+
+
+```move [sui.move]
+public entry fun mint(
+    treasury_cap: &mut TreasuryCap<GOODYLILI>,
+    amount: u64,
+    recipient: address,
+    ctx: &mut TxContext,
+) {
+    let coin = coin::mint(treasury_cap, amount, ctx);
+    transfer::public_transfer(coin, recipient);
+}
+```
+
+In this case, after minting, we’ve sent the tokens to the specified address. The function is public, but only an address with the treasury cap can mint the tokens.
+
+Now that everything looks great, you can publish the package on chain with this command:
+
+```shell [Terminal]
+sui client publish --gas-budget 100000000
+```
+
+You should get the transaction details along with the coins’ package ID from the output of the transaction like this:
+
+![image.png](attachment:aaf554c3-e7c4-4964-91ca-7189bcbad0c0:image.png)
+
+That’s not where it ends. You need to deploy on a DEX to make your tokens tradable.
+
+## Deploying Sui Tokens on a DEX
+
+Deploying tokens on DEXs is easy. You have to pair them with any other tokens with a value.
+
+You will most likely want to do this with popular tokens like Sui or USDC, which have significant liquidity.
+
+First, visit the DEX. In this case, we’re deploying on Aftermath, so visit aftermath.finance, connect your wallet, and follow these steps.
+
+
+// video here
+
+
+That’s it, as you can see, you can now trade your tokens.
+
+## Conclusion
+
+You’ve learned how to create and deploy a coin from start to finish and get it trading on a DEX.
+
+Next, learn how you can do the same for NFTs with regular objects and Kiosks.

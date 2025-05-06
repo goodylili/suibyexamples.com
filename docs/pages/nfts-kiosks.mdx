@@ -1,0 +1,305 @@
+# Building NFTs and Setting up Kiosks on Sui
+
+You want to launch an NFT collection on Sui? Great choice! Sui is one of the few blockchains where NFTs are alive. Sui NFTs are dynamic, and you can make them evolve.
+
+This article will guide you through the end-to-end process of launching an NFT collection on Sui. Ultimately, you should have an NFT that’s tradable on marketplaces.
+
+## Getting Started & Prerequisites
+
+This article assumes you understand Sui Move and have already installed your development environment with an IDE and Sui CLI. If you don’t,  check out this article to get set up
+
+Once you’re all set up, create a new project with this command:
+
+```bash [Terminal]
+sui move new <your project name>
+```
+
+Great, now add these imports to the top of the file where you’re writing your code:
+
+```move [sui.move]
+use std::string::{Self, String}; // work with strings
+use sui::url::{Self, Url}; // work with URLs
+use sui::event; // emit events
+use sui::balance::{Self, Balance}; // work with balances
+use sui::coin::{Self, Coin}; // work with coins
+```
+
+Now, let's get our hands dirty defining structs for our NFT
+
+## Building an NFT on Sui
+
+Before defining your structs, you need to understand your aim and your NFT collection's traits, habits, and features.
+
+In this tutorial, we want an NFT collection with life, so we’d give it an account. The NFT collection should be able to hold assets. This is great if you want to create an NFT collection with revenue or airdrops to holders.
+
+```move [sui.move]
+public struct GOODYLILI_NFT<phantom T> has key, store {
+    id: UID,
+    name: String,
+    rarity: u8,
+    description: String,
+    url: Url,
+    balance: Balance<T>
+}
+
+public struct NFTMinted has copy, drop {
+    rarity: u8,
+    nft_name: String,
+    description: String,
+    url: Url,
+}
+```
+
+The `GOODYLILI_NFT` struct represents the NFT collection with all the necessary fields, including a `balance` field. Notice that the struct has the `key` and `store` abilities.
+
+The `NFTMinted` struct is for emitting events whenever a new NFT is minted.
+
+Now, you’ll need an `init` function that will execute once to initialize traits and claim the publisher capability. The publisher capability allows you admin controls over the NFT collection.
+
+
+
+```move [sui.move]
+fun init(otw: GOODYLILI, ctx: &mut TxContext) {
+        let keys = vector[
+            utf8(b"name"),
+            utf8(b"description"),
+            utf8(b"image_url"),
+            utf8(b"rarity"),
+
+        ];
+
+        let values = vector[
+            utf8(b"name"),
+            utf8(b"description"),
+            utf8(b"image_url"),
+            utf8(b"rarity"),
+
+        ];
+
+        let publisher = package::claim(otw, ctx);
+
+        let mut display = display::new_with_fields<GOODYLILI_NFT<SUI>> (
+            &publisher, keys, values, ctx
+        );
+
+        display.update_version();
+
+        transfer::public_transfer(publisher, tx_context::sender(ctx));
+        transfer::public_transfer(display, tx_context::sender(ctx));
+    }
+```
+
+The `publisher` variable has this capability, and once the init function runs, it will be sent to the address that deploys the contract.
+
+You’ll also need a mint function to mint new NFTs into circulation. Here’s how to declare one.
+
+```move [sui.move]
+#[allow(lint(self_transfer))]
+public fun mint_to_sender<T: store>(
+    name: vector<u8>,
+    description: vector<u8>,
+    url: vector<u8>,
+    ctx: &mut TxContext,
+) {
+    let sender = ctx.sender();
+    let nft = GOODYLILI_NFT<T> {
+        id: object::new(ctx),
+        name: string::utf8(name),
+        description: string::utf8(description),
+        url: url::new_unsafe_from_bytes(url),
+        balance: balance::zero(), // Initialize with zero balance
+    };
+
+    event::emit(NFTMinted {
+        nft_name: string::utf8(name),
+        description: string::utf8(description),
+        url: url::new_unsafe_from_bytes(url),
+    });
+
+    transfer::public_transfer(nft, sender);
+}
+```
+
+All you needed to do was create a new instance of the struct. Cool right? Here, we are emitting an event with details of our minted NFT.
+
+Anybody should be able to fund the NFT’s account, so you’ll need to make the add function a public entry function.
+
+```move [sui.move]
+public entry fun add_balance<T: store>(
+    nft: &mut GOODYLILI_NFT<T>,
+    amount: u64,
+    payment: &mut Coin<T>
+){
+    let coin_balance = coin::balance_mut(payment);
+    let paid = balance::split(coin_balance, amount);
+    balance::join(&mut nft.balance, paid);
+}
+```
+
+The `coin_balance` is the balance of the `Coin<T>` passed in by the caller, stored in the object. Then, the `paid` is a split off the amount from the balance. The `balance::join` function joins the NFT’s balance with the amount paid.
+
+You’ll also need a function for holders to withdraw funds from the NFT.
+
+```move [sui.move]
+public entry fun withdraw_balance<T: store>(
+    nft: &mut GOODYLILI_NFT<T>,
+    amount: u64,
+    ctx: &mut TxContext
+    ) {
+        let withdrawn = coin::from_balance(
+            balance::split(&mut nft.balance, amount),
+            ctx
+        );
+
+        transfer::public_transfer(withdrawn, tx_context::sender(ctx));
+    }
+}
+```
+
+In this case, you’re using the `balance::split` function to split the amount from the NFT’s balance before sending the funds to the transaction sender.
+
+## Launching NFTs with Kiosk
+
+Sui provides kiosks that are more ergonomic than on-chain assets. It’s like opening a brand for items, and then you get to specify and enforce policies over the items.
+
+Many of your favourite NFT collections, including Prime Machin and Rootlets, use Kiosk.
+
+First, you need to add all these imports to your package.
+
+```move [sui.move]
+use sui::url::Url;
+use std::string::String;
+use sui::balance::Balance;
+use sui::sui::SUI;
+use sui::coin::{Self, Coin};
+use sui::balance;
+use sui::transfer_policy::{Self, TransferPolicy, TransferPolicyCap, TransferRequest};
+
+const E_INSUFFICIENT_AMOUNT: u64 = 0;
+```
+
+You’re importing the usual suspects: strings, coins, and balances plus `transfer_policy`, which is the real star of this section.
+
+The `transfer_policy` module defines **how assets can be transferred** and enforces rules on those transfers.
+
+Here’s a table of the transfer policy features:
+
+| Feature | What it means |
+| --- | --- |
+| `TransferPolicy<T>` | A shared object that defines the rules for transferring type `T` |
+| `TransferPolicyCap<T>` | A capability (object) that lets you **modify** the policy — only the holder can change or add rules |
+| `TransferRequest<T>` | An object created whenever someone tries to transfer type `T`. They must fulfill the policy rules before the transfer is finalized |
+| `add_rule(...)` | Adds a custom rule (like “pay 1 SUI”) to the policy |
+| `add_to_balance(...)` | Lets you collect fees or payments tied to transfers |
+| `add_receipt(...)` | Marks a rule as fulfilled for a given transfer |
+| `confirm_request(...)` | Finalizes a transfer if **all** rules are met |
+
+Now that you understand the transfer policy. Let’s define the NFT struct and specify transfer policies on the NFT.
+
+```move [sui.move]
+public struct Art has key, store {
+    id: UID,
+    name: String,
+    url: Url,
+    balance: Balance<SUI>,
+}
+```
+
+We’ll need to define a **rule** and a **configuration t**o charge a fee or enforce conditions:
+
+```move [sui.move]
+public struct Rule has drop {}
+public struct Config has store, drop {}
+```
+
+This creates a new rule type, `Rule`, and an empty `Config`. We’ll plug this into the policy later.
+
+Here’s a basic function to mint a new `Art` NFT:
+
+```move [sui.move]
+/// Mint an NFT (for demo/testing)
+public fun mint(name: String, url: Url, ctx: &mut TxContext): Art {
+    Art {
+        id: object::new(ctx),
+        name,
+        url,
+        balance: balance::zero(),
+    }
+}
+```
+
+It creates a new object and assigns it a name, image, and zero token balance.
+
+Now we need to create a transfer policy like this:
+
+```move [sui.move]
+#[allow(lint(share_owned, self_transfer))]
+public fun create_policy(publisher: &sui::package::Publisher, ctx: &mut TxContext) {
+    let (policy, cap) = transfer_policy::new<Art>(publisher, ctx);
+    transfer::public_share_object(policy);
+    transfer::public_transfer(cap, tx_context::sender(ctx));
+}
+```
+
+Here’s what’s happening:
+
+- `transfer_policy::new` creates the policy and its capability (`cap`)
+- The policy is made **shared** so everyone can access it
+- The cap is **transferred** to the caller so only they can manage the policy
+
+This step is mandatory. Without a policy, Kiosk listings won’t be enforceable.
+
+Now, we can  attach the rule to the policy like this:
+
+```move [sui.move]
+public fun add_rule(
+    policy: &mut TransferPolicy<Art>,
+    cap: &TransferPolicyCap<Art>
+) {
+    transfer_policy::add_rule(Rule {}, policy, cap, Config {});
+}
+
+```
+
+This registers your custom rule (`Rule`) and its config. This function can only be called by whoever holds the `TransferPolicyCap`.
+
+Here’s the critical part: enforcing a **1 SUI transfer fee:**
+
+```move [sui.move]
+public fun pay(
+    policy: &mut TransferPolicy<Art>,
+    request: &mut TransferRequest<Art>,
+    coin: Coin<SUI>
+) {
+    assert!(coin::value(&coin) == 1_000_000_000, E_INSUFFICIENT_AMOUNT);
+    transfer_policy::add_to_balance(Rule {}, policy, coin);
+    transfer_policy::add_receipt(Rule {}, request);
+}
+```
+
+What’s happening here:
+
+- It checks the coin’s value is exactly **1 SUI** (in Mist)
+- Adds that payment to the policy’s internal balance
+- Marks the `TransferRequest` as passed for this rule
+
+Once all rules are satisfied, the buyer must **confirm the request**:
+
+```move [sui.move]
+public fun confirm(
+    policy: &TransferPolicy<Art>,
+    request: TransferRequest<Art>
+) {
+    transfer_policy::confirm_request(policy, request);
+}
+```
+
+The transfer is considered pending until this step is completed, and ownership won’t be finalized.
+
+This step is essential. Without calling `confirm_request()`, the item is stuck in limbo. That’s why TradePort asks recipients to claim from Kiosks.
+
+## Conclusion
+
+You now know how to launch NFTs on Sui. Ideally, you’ll need a decentralized storage to store your NFTs; check out Walrus for that.
+
+There’s a Walrus client tutorial in this series you should check out to learn how to store your NFTs on Walrus

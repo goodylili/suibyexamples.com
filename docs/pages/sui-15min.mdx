@@ -1,0 +1,584 @@
+# Learn Sui Move in 15 Minutes
+
+You want to learn Sui Move and start building really fast. I know what you are! You’re a developer who doesn’t have time for sentiments and wants to get shipping, especially since you’ve heard Move is easy peasy.
+
+This article will teach you everything you need to know to build and publish your first Sui smart contracts (programs) on the blockchain.
+
+## Packages
+
+You write programs that are grouped into packages to run on-chain. Every published package has an address. You can interact with packages by sending transactions that call the functions.
+
+Before we get our hands dirty, go to this article and follow the steps to set up Sui on your computer.
+
+Once you’re all set up, execute this command to create your first Sui project:
+
+```bash [Terminal]
+sui move new impatience
+```
+
+Now, enter into the directory and open it in your code editor of choice.
+
+```bash [Terminal]
+cd impatience
+code .
+```
+
+The command above enters the `impatience` directory and opens it in Visual Studio Code.
+
+When you open the package, you should expect to see this file directory loaded with some content in the file.
+
+<img src="/package-structure.png" alt="Package structure"/>
+
+
+
+You’ll write your code in the `sources/` directory and tests in the `test/` directory. If there are any files you don’t want to include in your Git version control operations, you’ll include them in the `.gitignore` file. The `Move.toml` file is used to manage your packages and dependencies.
+
+### Package Manifest (Move.toml)
+
+The `Move.toml` file is the manifest. It contains the package’s details and dependencies in TOML format, with different sections for each.
+<img src="/move-toml.png" alt="The Move.toml File"/>
+
+
+In the [package] section, you’ll define the package name (`impatient`) and the language edition (`2024.beta`). The `[dependencies]` section would have the external packages, e.g., the Sui package.
+
+Named addresses go under `[addresses]` to assign aliases like `zsh = "0x0"` to onchain addresses for easier referencing in Move code. Optional sections like `[dev-dependencies]` and `[dev-addresses]` allow you to customize test environments.
+
+## Addresses and Accounts
+
+Addresses are unique identifiers on the Sui blockchain. Sui uses addresses to identify packages, accounts, and objects.
+
+On Sui, addresses are case-sensitive, have a fixed byte size of 32 bytes, and are usually represented as hexadecimal with the `0x` prefix.
+
+<img src="/addresses.png" alt="Distinguishing addresses"/>
+
+Sui differentiates between account addresses and contract addresses by using the package name at the end of the address.
+
+Some addresses are reserved for identifying standard packages and objects. T[he Move Book reference](https://move-book.com/appendix/reserved-addresses.html) has all of them.
+
+## Transactions
+
+Transactions are “actions” on the blockchain, such as calling functions, sending coins, or updating data. They can be anything that adds to or changes the state of data on the chain.
+
+Every transaction includes:
+
+- **Sender** – the account that signs and sends it
+- **Commands** – the list of actions to run, in order
+- **Inputs** – values or objects used in the commands
+- **Gas** – a coin used to pay for the transaction
+- **Gas budget/price** – how much will you pay to get it onchain?
+
+Transactions return the transaction digest, status, and details like what changes, the cost, and events.
+
+## Objects
+
+On Sui, everything is an object. The objects are stored directly on the user accounts for full control.
+
+These are the types of addresses:
+
+- **Owned Objects**: Owned objects, like your tokens and NFTs, have one owner. Only the owner can use and interact with them.
+- **Shared Objects**: These have multiple owners, e.g, liquidity pools.
+- Immutable Objects: They cannot be modified once they’re initialized.
+
+Every Sui object has:
+
+- **ID**: A unique identifier.
+- **Type**: Defines what kind of object it is.
+- **Owner**: Who owns the object (an address, another object, or shared).
+- **Version**: Tracks changes to the object.
+- **Last Transaction**: The most recent transaction that modified the object.
+
+You can add custom fields to objects to add features or new data.
+
+### Publishing Packages Onchain
+
+Once you’re done writing your packages, you’ll need to publish them, and you can do that via the Sui CLI tool.
+
+First, you must build the package locally to ensure everything works.
+
+```bash [Terminal]
+sui move build
+```
+
+If there are no errors with your output, you’ve successfully built the package.
+
+If you’ve written tests, run them before publishing with this command:
+
+```bash [Terminal]
+sui move test
+```
+
+Once your test cases pass, you can publish them to any network (mainnet, testnet, localnet) with this command.
+
+```bash [Terminal]
+sui client publish --gas-budget <BUDGET_IN_MIST> <PACKAGE_NAME>
+
+# you can exempt the package name if it's your current working directory
+sui client publish --gas-budget 100000000
+```
+
+It would verify the dependencies on-chain and publish the package. You would then get many useful transaction data, including the package ID and the transaction digest.
+
+![image.png](attachment:8aaed66d-dd8c-484c-973f-03fcd62e11ed:image.png)
+
+## Move Modules
+
+Modules are how you manage units of your packages. You can use them to isolate similar functionality.
+
+You’ll declare modules using lowercase and snake case. Module names must be unique throughout the package.
+
+```move [sui.move]
+module state::impatient;
+module state::paitient;
+```
+
+All your declarations (structs, functions, constants and imports) will enter the module.
+
+### Importing Modules
+
+When working with multiple modules, you may need to import one module from another. Specifying the namespace with the `use` keyword works in this case:
+
+```move [sui.move]
+use sui::coin::{Self, Coin};
+```
+
+In this case, we’re importing the current module and the coin structure. When accessing items, you’ll specify `Self` without repeating the module name.
+
+You’ll need to add external dependencies to the dependencies section of your `Move.toml` file.
+
+```toml
+[dependencies.Pyth]
+git = "https://github.com/pyth-network/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "sui-contract-mainnet"
+```
+
+Then you can reference what you need to access with the `use` keyword.
+
+```move [sui.move]
+use pyth::price;
+```
+
+You’d have noticed that the `Sui` dependency has already been imported. You have access to those and automatically, the `std` module, which is the Move standard library.
+
+## Data Structures and Types
+
+Primitive types are your everyday data types. Sui Move supports:
+
+- `u8`, `u16`, `u32`, `u64`, `u128`, `u256` – Unsigned integers of various sizes. Pick one and stick to it unless you like debugging overflow errors.
+- `bool` – `true` or `false`.
+- `signer` – a special type that represents the person calling the function. You use this to prove identity and ownership.
+
+Here’s how you can assign variables on types with the operator `=` operation:
+
+```move [sui.move]
+let <variable_name>[: <type>]  = <expression>;
+
+// Unsigned integers
+let a: u8 = 255;
+let b: u64 = 1000000;
+let c: u128 = 999999999999999999;
+
+// Boolean values
+let is_active: bool = true;
+let is_zero: bool = false;
+
+// Address
+let user: address = @0x123;
+let system: address = @0x0;
+```
+
+The variables you’ve declared above are immutable (their values cannot change). If you need to change them, you’ll need to add the `mut` keyword in your definition.
+
+```move [sui.move]
+let mut <variable_name>[: <type>] = <expression>;
+```
+
+:::info
+
+You can't create a `signer` manually. The system passes that in when someone calls your code.
+
+:::
+
+## Conditionals
+
+Move has the classic `if`, `else if`, `else`. Here’s how you’ll use them:
+
+```move [sui.move]
+if health == 0 {
+    // do something
+} else if health < 20 {
+    // do something else
+} else {
+    // default case
+}
+```
+
+You can assign values conditionally, too:
+
+```move [sui.move]
+let y = if (x > 0) { 1 } else { 0 };
+```
+
+Both `if` and `else` branches must return the same type if you're assigning to a variable.
+
+You can use `assert!` to enforce rules at runtime:
+
+```move [sui.move]
+assert!(mana >= 10, 0);
+```
+
+This checks if the condition is true. If it is, execution continues as usual. If it **is not**, the program **aborts immediately** and throws an error with **code `0`**.
+
+## Loops
+
+You have `while` and `loop` repetitions:
+
+While loops run as long as the condition is true:
+
+```move [sui.move]
+let mut x = 0;
+while (x < 5) {
+    x = x + 1;
+}
+```
+
+Useful when you know the ending condition.
+
+On the other hand, `loop` runs forever (until you manually `break` out of it):
+
+```move [sui.move]
+let mut x = 0;
+loop {
+    x = x + 1;
+    if (x == 5) {
+        break;
+    }
+}
+```
+
+You can use the `break` and `continue` keywords to exit a loop and skip to another iteration respectively.
+
+```move [sui.move]
+loop {
+    x = x + 1;
+
+    if (x % 2 == 1) {
+        continue; // skip odd numbers
+    }
+
+    if (x == 10) {
+        break; // exit when x is 10
+    }
+}
+```
+
+Want to leave a function before reaching the end? Use the `return` keyword. More on that in a bit.
+
+## Structs
+
+Structs are how you declare custom types for whatever you’re building. You’ll declare a struct with the `struct` keyword with the name of the type and add fields like this:
+
+```move [sui.move]
+public struct Artist {
+    name: String,
+    age: u16,
+}
+```
+
+Structs are also private by default. You’ll need to make them public with the `public` visibility modifier as above.
+
+
+
+> Move does not support recursive structs so structs cannot encapsulate structs.Structs are more in Sui move, they also have abilities that define their behaviours e.g, adding any of the attributes means:
+
+- `copy` – can be copied.
+- `drop` – can be destroyed.
+- `store` – can be stored in memory.
+- `key` – can live on the blockchain as an object.
+
+Here’s how you can declare a struct with attributes:
+
+```move [sui.move]
+struct Counter has key {
+    value: u64,
+}
+```
+
+The `Counter` struct can now exist on-chain as an object with an ID itself.
+
+## Vectors
+
+Vectors are how you’ll express a list of items. They’re dynamic and shrinkable.
+
+```move [sui.move]
+let nums: vector<u64> = vector[1, 2, 3];
+```
+
+You’ll manipulate them using the `vector` module. It’s part of the standard library, so you don’t have to import it.
+
+```move [sui.move]
+vector::push_back(&mut nums, 4);
+let last_value = vector::pop_back(&mut nums);
+```
+
+The `push_back` method adds an element to the end of the vector, and the `pop_back` method removes the last element.
+
+## Collections
+
+You can go further with Vectors for more complex operations around a collection of items.
+
+## VecSet
+
+VecSet stores unique items, no duplicates. Very useful if you want to store addresses or unique IDs.
+
+You’ll have to import `VecSet` from the Sui library like this:
+
+```move [sui.move]
+use sui::vec_set::{Self, VecSet};
+```
+
+You can declare an empty set like this:
+
+```move [sui.move]
+let set = vec_set::empty<u8>(); // create an empty set
+```
+
+You can declare a VecSet field in a struct like this:
+
+```move [sui.move]
+public struct Airdrop has drop {
+    eligible: VecSet<address>
+}
+```
+
+VecSet will fail when an attempt is made to insert an existing item in the set.
+
+## VecMap
+
+You’d use VecMaps to store a collection of key-value pairs and access elements by their keys.
+
+> The keys must be unique. If they’re not, the old one get’s replaced, better not to try.VecMaps come in handy in cases where you want to map addresses to balances or anything of the sort.
+
+You’ll have to import `VecMap` from the Sui library like this:
+
+```move [sui.move]
+use sui::vec_map::{Self, VecMap};
+```
+
+You can declare an empty map like this:
+
+```move [sui.move]
+let mut map = vec_map::empty();
+```
+
+You can declare a VecMap field in a struct like this:
+
+```move [sui.move]
+public struct Allocations has drop {
+    x_username: String,
+    allocations: VecMap<address, u8>
+}
+```
+
+## Strings
+
+Strings in Move are *not* like JS or Python strings. They’re byte arrays with UTF-8 encoding in the `String` module.
+
+First, you’ll need to import the module and methods you need from the `string` library:
+
+```move [sui.move]
+use std::string::{Self, String};
+```
+
+Now you can use the `utf8` method to declare a string variable.
+
+```move [sui.move]
+let hello: String = string::utf8(b"Hello");
+```
+
+You can also declare strings with vector elements with the `to_string` method like this:
+
+```move [sui.move]
+let hello = b"Hello".to_string();
+```
+
+Now you can use these methods to interact with the strings.
+
+## Constants
+
+Need a value that never changes? Declare a constant with the `const` keyword:
+
+```move [sui.move]
+const MAX_SUPPLY: u64 = 1000000;
+```
+
+Constants must be compile-time evaluable. No funny business like calling functions or referencing state.
+
+## Option
+
+Options represent values that may not exist. You’ll encase the field type with `Option<Type>` to specify the field is optional.
+
+```move [sui.move]
+public struct User has drop {
+    first_name: String,
+    middle_name: Option<String>,
+    last_name: String,
+}
+```
+
+In this case, the `middle_name` field is optional. When the struct is initialized, it can contain a string value or remain empty.
+
+## Bags
+
+Bags are key-value stores with no rules. They are like a carry-everything collection, storing any value of any type.
+
+They come in handy when you don’t want to restrict value types or you need to store dynamic content that you’ll unpack later.
+
+You’ll need to import  bags to use them, like this:
+
+```move [sui.move]
+use sui::bag::{Self, Bag};
+```
+
+Then you can declare a bag as a variable or a struct field.
+
+```move [sui.move]
+use sui::bag::{Self, Bag};
+
+let mut bag = bag::new(ctx);
+
+public struct Carrier has key {
+    id: UID,
+    bag: Bag,
+}
+```
+
+You can use methods on your Bag variables or fields, like this:
+
+```move [sui.move]
+bag.add(b"name", string::utf8(b"Ada"));
+```
+
+In this case, you’ve added a key-value pair to the bag  the string in the bag using the `my_key` key with the `borrow` method.
+
+## Tables
+
+Tables are an underrated data structure in Sui Move. Similar to bags, they’re strict; you’d need to specify the types in the table beforehand, and they’d be enforced on every entry.
+
+Here’s how you’ll import tables from the Sui package:
+
+```move [sui.move]
+use sui::table::{Self, Table};
+```
+
+Now you can declare your tables like this:
+
+```move [sui.move]
+let mut table: Table<K, V> = table::new<K, V>(ctx);
+
+public struct UserRegistry has key {
+    id: UID,
+    table: Table<address, String>,
+}
+```
+
+You can populate your tables with the `add` method like this:
+
+```move [sui.move]
+let mut table: Table<address, String> = table::new<address, String>(ctx);
+
+table.add(@0x123, string::utf8(b"Alice"));
+```
+
+In this case, we’ve declared a table that maps addresses to strings before adding an entry using the `add` method.
+
+## Functions and Methods
+
+You have functions for defining reusable logic. You’ll declare them in Move modules like this:
+
+```move [sui.move]
+fun greet():   {
+    string::utf8(b"Hello, Sui!")
+}
+```
+
+In this case, the `greet()` function returns a String.
+
+Functions can take in parameters and return multiple parameters as well.
+
+```move [sui.move]
+fun add(a: u64, b: u64): (u64, u64) {
+    (a + b, b - a)
+}
+```
+
+Functions are private by default. If you want external modules or
+
+You can write functions operating on structs as methods by making the struct the first parameter, like this:
+
+```move [sui.move]
+public struct Hero has drop {
+    health: u8,
+}
+
+public fun heal(self: &mut Hero) {
+    self.health = self.health + 10;
+}
+
+// Usage
+let mut hero = Hero { health: 100 };
+hero.heal();
+```
+
+This defines a `Hero` struct as a `health` field and a `heal`ing function that increases that health.
+
+Because the `heal` function takes `&mut Hero` as the first argument and is defined in the same module, you can call it using method syntax like `hero.heal();`. It's just syntactic sugar—the compiler rewrites it as `heal(&mut hero)` under the hood.
+
+## **Memory Management & Ownership**
+
+Move is built with Rust, so the ownership and borrowing primitives are valid, and they play nicely too, especially since you’re working with assets.
+
+In Move, variables aren’t copied by default—they’re **moved**.
+
+```move [sui.move]
+let name = string::utf8(b"Ada");
+let name2 = name; // name is now invalid
+```
+
+The value moved into `name2`, and `name` is no longer usable unless the type has the `copy` ability.
+
+Want to reuse a value without moving it? Borrow it:
+
+```move [sui.move]
+let ref_name = &name;        // read-only borrow
+let mut_ref = &mut name2;    // mutable borrow
+```
+
+You can have multiple immutable borrows, or one mutable borrow, but not both simultaneously.
+
+## Generics
+
+Generics are available for defining fields and variables that work with any type.
+
+```move [sui.move]
+struct Wrapper<T> has store {
+    value: T,
+}
+```
+
+You can now create a `Wrapper<u64>`, a `Wrapper<String>`, or whatever else.
+
+Here’s how you’ll initialize a generic struct:
+
+```move [sui.move]
+let wrapped_number = Wrapper { value: 42 };
+let wrapped_text = Wrapper { value: string::utf8(b"hello") };
+```
+
+Just ensure the type you're wrapping has the right abilities (like `store`) or the compiler will yell at you.
+
+## Conclusion
+
+You’ve learnt the basics of Sui Move, enough for you to get your hands dirty. You’re now a Sui developer.
+
+Next is an advanced variant of this article where we’ll delve into smart contract specifics to help you build your first project.

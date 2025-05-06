@@ -1,0 +1,114 @@
+# Build a Wallet Evacuation Package
+
+Have you ever wanted to send multiple assets to another wallet or totally evacuate a wallet because you think you’re at risk of a drainer?
+
+I haven’t come across a tool or wallet that allows you to do this, but it’s really useful, so why not build one on Sui now?
+
+## Building the Evacuation Package
+
+Once you have your project setup, define the module at the top of your Move file like this:
+
+```move [sui.move]
+module rendevous::evacuate;
+```
+
+Now import the `Coin` module like this:
+
+```move [sui.move]
+use sui::coin::Coin;
+```
+
+Feel free to define custom errors:
+
+```move [sui.move]
+const E_LENGTH_MISMATCH: u64 = 0;
+```
+
+You’ll use this to  catch cases where the user provides a mismatched number of coins and amounts.
+
+Here’s the function signature for the evacuation. The function takes in the recipient address, a vector of the coins and the amounts you want to send for each, and the transaction context.
+
+```move [sui.move]
+public entry fun evacuate_wallet<T: store>(
+    recipient: address,
+    mut coins: vector<Coin<T>>,
+    amounts: vector<u64>,
+    ctx: &mut TxContext,
+)
+```
+
+Now, you’d have to make sure the lengths of the vectors match like this:
+
+```move [sui.move]
+{
+    let num_coins = vector::length(&coins);
+    let num_amounts = vector::length(&amounts);
+    assert!(num_coins == num_amounts, E_LENGTH_MISMATCH);
+```
+
+Now, the core evaluation functionality!  You could go through each coin, split the amount to send, transfer both the split and leftover to the recipient, and clean up the original coin vector.
+
+```move [sui.move]
+ {
+    let num_coins = vector::length(&coins);
+    let num_amounts = vector::length(&amounts);
+    assert!(num_coins == num_amounts, E_LENGTH_MISMATCH);
+
+    let mut i = 0;
+    while (i < num_coins) {
+        let mut coin = vector::pop_back(&mut coins);
+        let amount = *vector::borrow(&amounts, i);
+        let portion = sui::coin::split(&mut coin, amount, ctx);
+        transfer::public_transfer(portion, recipient);
+        transfer::public_transfer(coin, recipient);
+        
+        i = i + 1;
+    };
+
+    vector::destroy_empty(coins);
+}
+```
+
+You have to destroy the original coin vector because in Sui Move, a **`vector<Coin<T>>`** does **not** have the **`drop`** ability (since **`Coin<T>`** itself does not have **`drop`**).
+
+Now build the package to make sure everything works as expected:
+
+```move [sui.move]
+sui move build
+```
+
+You can execute this command to publish the package to a Sui network.
+
+```move [sui.move]
+sui client publish --gas-budget 100000000
+```
+
+Execute this command to evacuate or send multiple coins to a wallet:
+
+```move [sui.move]
+sui client call \
+  --package <PACKAGE_ID> \
+  --module evacuate \
+  --function evacuate_wallet \
+  --args <RECIPIENT_ADDRESS> \
+         '[<COIN_ID_1>, <COIN_ID_2>, ...]' \
+         '[<AMOUNT_1>, <AMOUNT_2>, ...]' \
+  --type-args <TOKEN_TYPE> \
+  --gas-budget 100000000
+```
+
+Replace the placeholders:
+
+- `<PACKAGE_ID>` – your published package ID.
+- `<RECIPIENT_ADDRESS>` – the address you’re evacuating to.
+- `<COIN_ID_1>...` – the object IDs of the coins you’re transferring.
+- `<AMOUNT_1>...` – the exact amount to transfer from each coin.
+- `<TOKEN_TYPE>` – the type of the token (e.g., `0x2::sui::SUI` or your custom coin).
+
+Your tokens should all be sent in one transaction, and you’ll surely save on gas.
+
+## Conclusion
+
+If you ever need to send out multiple assets from a single wallet, you know how to go around it.
+
+Up next is clients because you’re definitely not shipping CLI commands to users.
