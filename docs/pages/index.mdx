@@ -2,15 +2,27 @@
 layout: landing
 ---
 
+
+
 import {HomePage} from 'vocs/components'
 
 <HomePage.Root>
-    <HomePage.Logo/>
-    <HomePage.Tagline>Sui for the Impatient: A fast-paced collection of tutorials, cheat sheets, code snippets and
-        guides to get you building on Sui faster than confirming an Ethereum transaction</HomePage.Tagline>
+    <div style={{display: 'inline-block', transform: 'scale(1.8)', transformOrigin: 'center'}}>
+        <HomePage.Logo/>
+    </div>
+    <HomePage.Description>
+
+        Full Sail is a next-generation AMM built on the Sui blockchain, designed to maximize liquidity and reward
+        alignment through a vote-escrow token model.
+        We are backed by the Sui Foundation and incubated by Aftermath Finance.
+
+    </HomePage.Description>
     <HomePage.Buttons>
         <HomePage.Button href="/sui-60s" variant="accent">Get started</HomePage.Button>
         <HomePage.Button href="https://github.com/goodylili/suibyexamples.com">Sui in 15 Minutes</HomePage.Button>
         <HomePage.Button href="https://github.com/goodylili/suibyexamples.com">GitHub</HomePage.Button>
     </HomePage.Buttons>
 </HomePage.Root>
+
+
+
