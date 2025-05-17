@@ -2,42 +2,24 @@ const topNav = [
     {
         text: "Getting Started",
         items: [
-            {
-                text: "Install CLI",
-                link: "/getting-started/cli-install",
-            }
-            ,
-            {
-                text: "First Contract",
-                link: "/getting-started/first-c",
-            },
-            {
-                text: "Creating Incentives",
-                link: "/liquidity/creating-incentives",
-            }
+            { text: "Introduction to Sui Move", link: "/intro-move" },
+            { text: "Sui CLI Cheatsheet", link: "/cli-cheatsheet" },
+            { text: "Learn Sui in 15 Minutes", link: "/sui-15min" },
         ],
+
     },
 
     {
         text: "Projects",
         items: [
-            {
-                text: `NFT Marketplace`,
-                link: `/examples/nft-marketplace`,
-            },
-            {
-                text: "DAO Governance",
-                link: "/examples/dao-governance",
-            },
-            {
-                text: "Token Standard",
-                link: "examples/token-standard",
-            },
+            { text: "Let's Launch a Sui Coin", link: "/launch-coin" },
+            { text: "NFTs and Kiosks on Sui", link: "/nfts-kiosks" },
+            { text: "Batch Transfer Contract", link: "/batch-transfer" },
         ],
     },
     {
         text: "GitHub",
-        link: "https://github.com/goodylili",
+        link: "https://github.com/goodylili/suibyexamples.com",
     },
 ]
 

@@ -2,27 +2,56 @@
 layout: landing
 ---
 
-
-
 import {HomePage} from 'vocs/components'
 
 <HomePage.Root>
-    <div style={{display: 'inline-block', transform: 'scale(1.8)', transformOrigin: 'center'}}>
+    <div style={{display: 'inline-block', transform: 'scale(3)', transformOrigin: 'center'}}>
         <HomePage.Logo/>
     </div>
-    <HomePage.Description>
+    <HomePage.Tagline>
+    </HomePage.Tagline>
 
-        Full Sail is a next-generation AMM built on the Sui blockchain, designed to maximize liquidity and reward
-        alignment through a vote-escrow token model.
-        We are backed by the Sui Foundation and incubated by Aftermath Finance.
+    <HomePage.Tagline>
+        Sui by examples is a collection of fast guides, tutorials, videos and cheat sheets for anybody to start learning
+        Move and building on Sui in minutes.<br/>
+        The project includes Sui CLI, Sui Move, Sui TypeScript SDK, Walrus Sites,
+        and Walrus TypeScript SDK tutorials guides for you to just Move.
+    </HomePage.Tagline>
 
-    </HomePage.Description>
+
     <HomePage.Buttons>
         <HomePage.Button href="/sui-60s" variant="accent">Get started</HomePage.Button>
-        <HomePage.Button href="https://github.com/goodylili/suibyexamples.com">Sui in 15 Minutes</HomePage.Button>
+        <HomePage.Button href="/sui-15min" variant="accent">Sui in 15 Minutes</HomePage.Button>
         <HomePage.Button href="https://github.com/goodylili/suibyexamples.com">GitHub</HomePage.Button>
+
+    </HomePage.Buttons>
+    <HomePage.Buttons>
+        <HomePage.Button href="https://www.youtube.com/channel/UCHe0n8ontqhnUJfm7igIoqQ">Youtube</HomePage.Button>
+
+        <HomePage.Button href="https://gist.github.com/goodylili">Code Gists</HomePage.Button>
     </HomePage.Buttons>
 </HomePage.Root>
 
-
-
+<div style={{
+    position: 'relative',
+    width: '100%',
+    paddingBottom: '56.25%', // 16:9 aspect ratio
+    height: 0,
+    overflow: 'hidden'
+}}>
+    <iframe
+        src="https://www.youtube.com/embed/KRbu5GvkTRc"
+        title="Sui Tutorial"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+        style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%'
+        }}
+    ></iframe>
+</div>
