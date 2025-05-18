@@ -12,19 +12,19 @@ You will likely deploy your Walrus site on Mainnet, so execute this command to i
 
 Execute this command to install the latest Walrus mainnet version:
 
-```bash
+```bash [terminal]
 curl -sSf https://docs.wal.app/setup/walrus-install.sh | sh
 ```
 
 You’ll need to add the `walrus` binary to your PATH. Also, you need to download the latest Walrus cofigurations with this command:
 
-```bash
+```bash [terminal]
 curl https://docs.wal.app/setup/client_config.yaml -o ~/.config/walrus/client_config.yaml
 ```
 
 Now execute this command to install the website builder.
 
-```rust
+```bash [terminal]
 SYSTEM= # set this to your system: ubuntu-x86_64, ubuntu-x86_64-generic, macos-x86_64, macos-arm64, windows-x86_64.exe
 curl https://storage.googleapis.com/mysten-walrus-binaries/site-builder-mainnet-latest-$SYSTEM -o site-builder
 chmod +x site-builder
@@ -32,13 +32,13 @@ chmod +x site-builder
 
 You’ll also need to move the binary to any directory included in your $PATH environment variable. You can do that with this command:
 
-```rust
+```bash [terminal]
 sudo mv site-builder /usr/local/bin/
 ```
 
 Once you’re set up, you should be able to use `site-builder` as a command in your terminal like this:
 
-```bash
+```bash [terminal]
 site-builder
 ```
 
@@ -52,7 +52,7 @@ In this case, I’m going to deploy a Vitepress site, so I’ll need to build it
 
 
 
-```rust
+```bash [terminal]
 npm run build
 ```
 
@@ -60,14 +60,14 @@ Once you have your static files based on whatever frontend framework you’re us
 
 You’ll need to download the latest Walrus configuration file. Execute this command for that:
 
-```rust
+```bash [terminal]
 mkdir -p ~/.config/walrus
 curl https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o ~/.config/walrus/sites-config.yaml
 ```
 
 You should find  the file in your working directory. Here’s the path:
 
-```rust
+```bash [terminal]
 ~/.config/walrus/sites-config.yaml
 ```
 
@@ -75,7 +75,7 @@ Now `site-builder` will automatically find it — you don't need to pass `--conf
 
 Now execute this command to deploy the site
 
-```rust
+```bash [terminal]
 site-builder publish ./dist --epochs 1
 ```
 

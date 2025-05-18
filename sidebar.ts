@@ -18,7 +18,8 @@ const sidebar = [
         text: "Development Projects",
         items: [
             { text: "Let's Launch a Sui Coin", link: "/launch-coin" },
-            { text: "NFTs and Kiosks on Sui", link: "/nfts-kiosks" },
+            { text: "Launch an NFT on Sui", link: "/nfts" },
+            { text: "Launch a Kiosk on Sui", link: "/kiosks" },
             { text: "Batch Transfer Contract", link: "/batch-transfer" },
             { text: "Wallet Evacuation Package", link: "/wallet-evac" },
         ],

@@ -1,0 +1,145 @@
+
+# Launching NFTs with Kiosk
+
+Sui provides kiosks that are more ergonomic than on-chain assets. It’s like opening a brand for items, and then you get to specify and enforce policies over the items.
+
+Many of your favourite NFT collections, including Prime Machin and Rootlets, use Kiosk.
+
+First, you need to add all these imports to your package.
+
+```move [sui.move]
+use sui::url::Url;
+use std::string::String;
+use sui::balance::Balance;
+use sui::sui::SUI;
+use sui::coin::{Self, Coin};
+use sui::balance;
+use sui::transfer_policy::{Self, TransferPolicy, TransferPolicyCap, TransferRequest};
+
+const E_INSUFFICIENT_AMOUNT: u64 = 0;
+```
+
+You’re importing the usual suspects: strings, coins, and balances plus `transfer_policy`, which is the real star of this section.
+
+The `transfer_policy` module defines **how assets can be transferred** and enforces rules on those transfers.
+
+Here’s a table of the transfer policy features:
+
+| Feature | What it means |
+| --- | --- |
+| `TransferPolicy<T>` | A shared object that defines the rules for transferring type `T` |
+| `TransferPolicyCap<T>` | A capability (object) that lets you **modify** the policy — only the holder can change or add rules |
+| `TransferRequest<T>` | An object created whenever someone tries to transfer type `T`. They must fulfill the policy rules before the transfer is finalized |
+| `add_rule(...)` | Adds a custom rule (like “pay 1 SUI”) to the policy |
+| `add_to_balance(...)` | Lets you collect fees or payments tied to transfers |
+| `add_receipt(...)` | Marks a rule as fulfilled for a given transfer |
+| `confirm_request(...)` | Finalizes a transfer if **all** rules are met |
+
+Now that you understand the transfer policy. Let’s define the NFT struct and specify transfer policies on the NFT.
+
+```move [sui.move]
+public struct Art has key, store {
+    id: UID,
+    name: String,
+    url: Url,
+    balance: Balance<SUI>,
+}
+```
+
+We’ll need to define a **rule** and a **configuration t**o charge a fee or enforce conditions:
+
+```move [sui.move]
+public struct Rule has drop {}
+public struct Config has store, drop {}
+```
+
+This creates a new rule type, `Rule`, and an empty `Config`. We’ll plug this into the policy later.
+
+Here’s a basic function to mint a new `Art` NFT:
+
+```move [sui.move]
+/// Mint an NFT (for demo/testing)
+public fun mint(name: String, url: Url, ctx: &mut TxContext): Art {
+    Art {
+        id: object::new(ctx),
+        name,
+        url,
+        balance: balance::zero(),
+    }
+}
+```
+
+It creates a new object and assigns it a name, image, and zero token balance.
+
+Now we need to create a transfer policy like this:
+
+```move [sui.move]
+#[allow(lint(share_owned, self_transfer))]
+public fun create_policy(publisher: &sui::package::Publisher, ctx: &mut TxContext) {
+    let (policy, cap) = transfer_policy::new<Art>(publisher, ctx);
+    transfer::public_share_object(policy);
+    transfer::public_transfer(cap, tx_context::sender(ctx));
+}
+```
+
+Here’s what’s happening:
+
+- `transfer_policy::new` creates the policy and its capability (`cap`)
+- The policy is made **shared** so everyone can access it
+- The cap is **transferred** to the caller so only they can manage the policy
+
+This step is mandatory. Without a policy, Kiosk listings won’t be enforceable.
+
+Now, we can  attach the rule to the policy like this:
+
+```move [sui.move]
+public fun add_rule(
+    policy: &mut TransferPolicy<Art>,
+    cap: &TransferPolicyCap<Art>
+) {
+    transfer_policy::add_rule(Rule {}, policy, cap, Config {});
+}
+
+```
+
+This registers your custom rule (`Rule`) and its config. This function can only be called by whoever holds the `TransferPolicyCap`.
+
+Here’s the critical part: enforcing a **1 SUI transfer fee:**
+
+```move [sui.move]
+public fun pay(
+    policy: &mut TransferPolicy<Art>,
+    request: &mut TransferRequest<Art>,
+    coin: Coin<SUI>
+) {
+    assert!(coin::value(&coin) == 1_000_000_000, E_INSUFFICIENT_AMOUNT);
+    transfer_policy::add_to_balance(Rule {}, policy, coin);
+    transfer_policy::add_receipt(Rule {}, request);
+}
+```
+
+What’s happening here:
+
+- It checks the coin’s value is exactly **1 SUI** (in Mist)
+- Adds that payment to the policy’s internal balance
+- Marks the `TransferRequest` as passed for this rule
+
+Once all rules are satisfied, the buyer must **confirm the request**:
+
+```move [sui.move]
+public fun confirm(
+    policy: &TransferPolicy<Art>,
+    request: TransferRequest<Art>
+) {
+    transfer_policy::confirm_request(policy, request);
+}
+```
+
+The transfer is considered pending until this step is completed, and ownership won’t be finalized.
+
+This step is essential. Without calling `confirm_request()`, the item is stuck in limbo. That’s why TradePort asks recipients to claim from Kiosks.
+
+## Conclusion
+
+You now know how to launch Kiosks on Sui. Most of the Kiosks I've interacted with are for NFT collections. But Kiosks are great for everything commercial really.
+
