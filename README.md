@@ -1,6 +1,6 @@
 # Sui By Examples
 
-<img src="/homepage.png" alt="Sui By Examples Homepage"/>
+<img src="/docs/public/homepage.png" alt="Sui By Examples Homepage"/>
 
 
 Sui by examples is a collection of fast guides, tutorials, videos and cheat sheets for anybody to start learning Move and building on Sui in minutes.
