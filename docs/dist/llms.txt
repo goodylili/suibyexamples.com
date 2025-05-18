@@ -1,0 +1,19 @@
+# Sui by Examples
+
+> Sui Examples for Developers to Start Moving Fast
+
+## Docs
+
+- [Airdrop Package on Sui](/batch-transfer): Airdrop/batch send smart contracts are a great way to consolidate knowledge after learning a new programming language.
+- [Sui CLI Cheat Sheet](/cli-cheatsheet): When building smart contracts, you’ll also need to build a client that interacts with the smart contract. Aside from querying on-chain data, Clients can read and execute smart contracts depending on the primitives defined in the contract.
+- [Introduction to Sui Move](/intro-move): Even as a developer with experience writing smart contracts with Rust and Solidity, I initially experienced some overhead trying to understand and express myself with Move.
+- [Create and Deploy Coins on Sui](/launch-coin): Tokens are the most trendy thing to do on-chain. Of course, you have launch pads like Movepump, DoubleUp, and all the others that allow you to create tokens and deploy them with zero code, but you can only go so far with them.
+- [Building NFTs and Setting up Kiosks on Sui](/nfts-kiosks): You want to launch an NFT collection on Sui? Great choice! Sui is one of the few blockchains where NFTs are alive. Sui NFTs are dynamic, and you can make them evolve.
+- [Beyond the Basics of Move](/prod-packages): Once you understand the basics of Move programming, you can move on to Sui development. This article is a sequel to the Sui Move in 15 minutes article.
+- [Learn Sui Move in 15 Minutes](/sui-15min): You want to learn Sui Move and start building really fast. I know what you are! You’re a developer who doesn’t have time for sentiments and wants to get shipping, especially since you’ve heard Move is easy peasy.
+- [Sui & Move Overview](/sui-60s): Move is the secure and resource-oriented programming language  for building on the Sui blockchain. It’s designed to manage digital assets safely and efficiently, giving developers fine-grained control over how assets are created, transferred, and stored.
+- [Advanced Sui TypeScript SDK Operations](/ts-advanced): You’re most likely building the frontend for your Sui, and you want to improve efficiency as you do so, so this article is for you.
+- [Sui & TypeScript SDK Basics](/ts-intro): Sui is the chain of the moment, and although Move is the holy grail for writing smart contracts on Sui, the TypeScript support is significant. You can interact with and use Sui and most of the DeFi apps on the ecosystem with TypeScript.
+- [Build a Wallet Evacuation Package](/wallet-evac): Have you ever wanted to send multiple assets to another wallet or totally evacuate a wallet because you think you’re at risk of a drainer?
+- [Let’s Deploy a Walrus Site](/walrus-deploy): Crypto’s centralized facets have most of their frontends on Web2 servers and services, and that's a pretty big deal. What if the entire stack could be decentralized?
+- [Walrus TypeScript SDK Guide](/walrus-ts): Walrus is undoutedly the best decentralized storage solution in the market right now by every metric. The developer tooling scene is also great.

@@ -1,0 +1,2804 @@
+# Sui by Examples
+
+> Sui Examples for Developers to Start Moving Fast
+
+## Airdrop Package on Sui
+
+Airdrop/batch send smart contracts are a great way to consolidate knowledge after learning a new programming language.
+
+The aim is simple: Instead of sending to multiple recipients in multiple transactions that use a lot of gas, you can send everything with one function and pay gas once. It’s all about saving fees in one clean transaction.
+
+### Building an Airdrop Package
+
+First, you’ll need to create the project if you don’t have one already.
+
+You know the drill; execute this command and open your project in your IDE of choice.
+
+```bash [Terminal]
+sui move new airdrop
+cd airdrop
+```
+
+Now, declare the module like this:
+
+```move [sui.move]
+module airdrop::mass_send;
+```
+
+These are the imports you’ll need. The `Coin` module for working with coins and the `event` module for emitting events.
+
+```move [sui.move]
+use sui::coin::{Self, Coin};
+use sui::event;
+```
+
+Now, define your event struct like this:
+
+```move [sui.move]
+public struct AirdropEvent has copy, drop {
+    amount: u64,
+    recipient: address,
+}
+```
+
+You can optionally define custom error codes. In this case, we need to make sure the lengths or the vectors match:
+
+```move [sui.move]
+const E_LENGTH_MISMATCH: u64 = 0;
+```
+
+Here's the main function signature. It takes a coin, a list of recipient addresses, and the amounts each one should receive.
+
+```move [sui.move]
+public entry fun send_by_allocation<T: store>(
+    coin: &mut Coin<T>,
+    recipients: vector<address>,
+    amounts: vector<u64>,
+    ctx: &mut TxContext
+)
+```
+
+Now, we can compare the lengths of the recipient vectors and amounts to ensure that every recipient has an allocation.
+
+```move [sui.move]
+let num_recipients = vector::length(&recipients);
+let num_amounts = vector::length(&amounts);
+assert!(num_recipients == num_amounts, E_LENGTH_MISMATCH);
+```
+
+The final piece in the puzzle is to use a loop to transfer tokens to all the recipients with the `public_transfer` function.
+
+```move [sui.move]
+let mut i = 0;
+while (i < num_recipients) {
+   let amount = *vector::borrow(&amounts, i);
+   let recipient = *vector::borrow(&recipients, i);
+   let portion = coin::split(coin, amount, ctx);
+   transfer::public_transfer(portion, recipient);
+
+
+   event::emit(AirdropEvent {
+            amount,
+            recipient,
+        });
+
+                i = i + 1;
+    };
+}
+```
+
+In the loop, you split the coin into the amount allocated for the specific recipient before sending it. Every transfer emits an event.
+
+Best part? It’s all one transaction. One gas fee.
+
+Now build the project for some house keeping. Everything should work fine.
+
+```move [sui.move]
+sui move build
+```
+
+Once it builds successfully, you can publish to the Sui network with this command.
+
+```move [sui.move]
+sui client publish --gas-budget 100000000
+```
+
+Once you’ve published you can call the function via Sui CLI like this to airdrop to multiple recipients:
+
+```bash [Terminal]
+sui client call \
+  --package <YOUR_PACKAGE_ID> \
+  --module mass_send \
+  --function send_by_allocation \
+  --args <COIN_OBJECT_ID> \
+         '[<RECIPIENT_1>, <RECIPIENT_2>, ...]' \
+         '[<AMOUNT_1>, <AMOUNT_2>, ...]' \
+  --type-args <TOKEN_TYPE> \
+  --gas-budget 10000000
+```
+
+Replace the arguments with actual values and you’re good to go. Your recipients should recieve the coins you specify.
+
+### Conclusion
+
+You’ve learned to execute an airdrop without spending so much on gas. Sui’s object-centric model and parallel execution engine make this kind of flow not just possible, but *natural*.
+
+With a single transaction, you can send tokens to dozens (or hundreds) of recipients; there is no need for multiple calls or gas fees.
+
+
+## Sui CLI Cheat Sheet
+
+When building smart contracts, you’ll also need to build a client that interacts with the smart contract. Aside from querying on-chain data, Clients can read and execute smart contracts depending on the primitives defined in the contract.
+
+Sui CLI is your best bet for a client since you can easily make CLI calls from any language you eventually decide to build clients with. In this article, I’ll provide an overview of the popular commands you’ll need while building on Sui.
+
+### Getting Started with Sui CLI
+
+First, you’ll need to install Sui CLI on your computer. Depending on the operating system and package manager you’re using, here’s how you can install Sui CLI on your computer:
+
+Execute this command on your terminal to install Sui CLI if you’re running a Unix-based operating system (macOS or Linux) via [Homebrew](https://brew.sh/).
+
+```bash [Terminal]
+brew install sui
+```
+
+Execute this command on your terminal to install Sui CLI if you’re running Windows via [Chocolatey](https://chocolatey.org/).
+
+```bash [Terminal]
+choco install sui
+```
+
+Another route you can use is the Cargo (Rust package manager) route. First, you’ll need to have Rust installed (ships with cargo) and then execute this command to install Sui CLI.
+
+```bash [Terminal]
+cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui --features tracing
+```
+
+You can always execute the `--version` flag to verify your installation and check the version of Sui CLI you have installed.
+
+```bash [Terminal]
+sui --version
+```
+
+One flag you’ll use frequently is the—`- help` flag for the description of every command.
+
+```bash [Terminal]
+sui --help
+```
+
+It works with almost every command. It should be your mantle whenever you’re stuck.
+
+<img src="/cli-commands.png" alt="Help on Sui CLI" />
+
+Regardless of the command, using `-h` or `--help` for help would always be handy.
+
+#### Environment Management with Sui CLI
+
+Every chain provides you with three fundamental networks: Mainnet, Testnet, and Devnet. You can also spawn a test chain locally to keep development in stealth mode.
+
+Here’s the command you’ll execute to spawn a local network.
+
+```bash [Terminal]
+RUST_LOG="off,sui_node=info" sui start --with-faucet --force-regenesis
+```
+
+The command calls the Sui CLI binary to start a faucet service and generate a new genesis block without persisting the local network state.
+
+Now, you can connect to the local network with the `new-env` command like this:
+
+```bash [Terminal]
+sui client new-env --alias local --rpc <rpc-url>
+
+# sui client new-env --alias local --rpc http://127.0.0.1:9000
+```
+
+You can switch and activate any environment with this general command.
+
+```bash [Terminal]
+sui client switch --env <ENV_NAME>
+```
+
+Now,  you can use this command to set the active environment to the new `local` environment you’ve created.
+
+```bash [Terminal]
+sui client switch --env local
+```
+
+The command switches the currently active environment to the local network you’re running.
+
+### Address and Key Management with Sui CLI
+
+You’ll be switching keys as you deploy smart contracts over the Sui CLI, so here’s how to do that.
+
+You can view the currently active address with the `active-address` command
+
+```bash [Terminal]
+sui client active-address
+```
+
+You can list all the addresses in your client with the `addresses` command.
+
+```bash [Terminal]
+sui client addresses
+```
+
+You can switch addresses as you please with the `--address` flag before specifying the address.
+
+### Key Management with Sui CLI
+
+When building your apps, for security or other reasons, you might want to run CLI commands to work with keys. The `keytool` command is
+
+You can list all the keys in a keystore with the `list` command like this:
+
+```bash [Terminal]
+sui keytool list
+```
+
+You can generate keys with the `generate` command followed with a specification of the scheme.
+
+```bash [Terminal]
+sui keytool generate [OPTIONS] <KEY_SCHEME> [DERIVATION_PATH] [WORD_LENGTH]
+```
+
+You’re probably familiar with the `ed25519` since that’s what most wallets use. Specify it like this.
+
+```bash [Terminal]
+sui keytool generate ed25519
+```
+
+You should get the output with the Sui address, mnemonic and other details.
+
+<img src="/generate-key-cli.png" alt="Generate Key Sui CLI" />
+
+The keypair should be private, if you’re generating for users then only users should see it, you should neither see it nor log it for any reasons.
+
+You can also import Keypair from existing mnemonic with the `import command`.
+
+```bash [Terminal]
+sui keytool import "<MNEMONIC_PHRASE>" ed25519
+```
+
+When you’ve imported it, you can switch to the keypair and start sending transactions with it.
+
+### Gas and Faucet with Sui CLI
+
+When you’re developing your apps, ideally, you’ll start out on devnet, then testnet before deploying to mainnet.
+
+Devnet and Testnet gas are free to acquire. But mainnet? nah.
+
+You can easily request gas on devnet with the `client faucet` command:
+
+```bash [Terminal]
+sui client faucet
+```
+
+For testnet, you’ll need to execute this cURL command to request gas:
+
+```bash [Terminal]
+curl --location --request POST 'https://faucet.devnet.sui.io/v1/gas' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "FixedAmountRequest": {
+        "recipient": "<YOUR SUI ADDRESS>"
+    }
+}'
+```
+
+You can also visit [the official Sui faucet website](https://faucet.sui.io/) to claim some Devnet and Testnet tokens.
+
+Use the `client gas` command to check the client’s available gas tokens on the current environment.
+
+```bash [Terminal]
+sui client gas
+```
+
+For mainnet transactions, you’ll need to acquire Sui from exchanges and fund your wallet.
+
+### Publishing Packages
+
+You can publish packages on to the Sui network with the `client publish` command.
+
+```bash [Terminal]
+sui client publish [OPTIONS] [package_path]
+```
+
+Here’s an example command for publishing a package with `5000000` MIST gas budget.
+
+```bash [Terminal]
+sui client publish --gas-budget 5000000
+```
+
+The gas budget isn’t fixed, you most likely want to check onchain for a suitable gas amount and pay it forward.
+
+### Coin Management with Sui CLI
+
+When you’re working with SUI coins, You’ll probably need to merge and split them often—especially when youjuggling gas or sending different amounts to various contracts or users.
+
+If you’ve have two coins lying around, and you want to consolidate them, use the `merge-coin` command like this:
+
+```bash [Terminal]
+sui client merge-coin --primary-coin <COIN_ID> --coin-to-merge <COIN_ID>
+```
+
+The `primary-coin` is the one you’ll keep, and the `coin-to-merge` is the one that gets absorbed.
+
+Need to split a coin instead? Maybe you want to pay out to multiple recipients or just need different denominations. You can slice a coin up using `split-coin` like this:
+
+```bash [Terminal]
+sui client split-coin --coin-id <COIN_ID> --amounts <AMOUNTS>
+```
+
+If you need to send out coins, you’ll use the `client transfer-sui` command like this:
+
+```bash [Terminal]
+sui client transfer-sui --sui-coin-object-id <COIN_ID> --to <ADDRESS>
+```
+
+It’s a simple handoff—you give it the coin ID and the recipient’s address, and it moves the funds.
+
+Sui has programmable transactions so you can send to multiple recipients at once with the `pay-sui` command:
+
+```bash [Terminal]
+sui client pay-sui --input-coins <COIN_ID> --recipients <ADDRESS> --amounts <AMOUNTS>
+```
+
+You’ll pass a coin (or a list of coins), and then specify the recipients and how much each should get. It’s perfect for batch payments or distributing tokens in bulk.
+
+### Object Management with Sui CLI
+
+Sui is all about objects. Contracts, tokens, and even your coins—they're all objects.
+
+To get detailed info on any object, just call:
+
+```bash [Terminal]
+sui client object <OBJECT_ID>
+```
+
+This will spit out all the metadata, owner info, and anything else the object is carrying.
+
+If your object has dynamic fields (like a registry or a growing data structure), you can dig into those too:
+
+```bash [Terminal]
+sui client dynamic-field <DYNAMIC_FIELD_ID>
+```
+
+This is very handy feature you might use often during development.
+
+### Programmable Transaction Blocks (PTBs)
+
+Sui is one of the few chains with native PTBs. Programmable Transaction Blocks let you bundle multiple operations into a single transaction—kinda like a mini-script that executes on-chain.
+
+Say you need to call a Move function directly from your CLI. You’ll do that like this:
+
+```bash [Terminal]
+sui client ptb --move-call <PACKAGE>::<MODULE>::<FUNCTION> "<TYPE>" <ARGS>
+```
+
+Replace the package address, module name, and function you’re targeting. Then drop in the type and arguments as needed.
+
+And if you want to transfer multiple objects to another wallet in one go, you can use PTBs as well:
+
+```bash [Terminal]
+sui client ptb --transfer-objects "[<OBJECT_ID>]" <ADDRESS>
+```
+
+Wrap the object IDs in brackets if you’re sending more than one, and finish it off with the recipient’s address.
+
+### Conclusion
+
+Hopefully, this article suffices for introducting you to the Sui CLI tool. It’s more than a client, there’s a lot you can do with this tool.
+
+If you ever need a quick refresher or you’re trying out a new command, make the [Sui CLI Cheat Sheet](https://docs.sui.io/references/cli/cheatsheet) your best friend. And when in doubt, the [Sui Client CLI Docs](https://docs.sui.io/references/cli/client) have the full breakdown.
+
+
+## Introduction to Sui Move
+
+<div
+  style={{
+  position: 'relative',
+  width: '100%',
+  paddingBottom: '56.25%', // 16:9 aspect ratio
+  height: 0,
+  overflow: 'hidden'
+}}
+>
+  <iframe
+    src="https://www.youtube.com/embed/KRbu5GvkTRc"
+    title="Sui Tutorial"
+    frameBorder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    referrerPolicy="strict-origin-when-cross-origin"
+    allowFullScreen
+    style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%'
+      }}
+  />
+</div>
+
+Even as a developer with experience writing smart contracts with Rust and Solidity, I initially experienced some overhead trying to understand and express myself with Move.
+
+This is the first article in my Sui Move series. I promise to set you up for success with everything you need to start building on the Sui blockchain as soon as possible.
+
+### Getting Started With Sui Move
+
+You don’t need development experience to start writing smart contracts. Move is a language with its primitives, so you’ll need some expertise here. Sui Move is the JavaScript of Web3.
+
+To remain language-agnostic, we’ll use the Sui-CLI tool to interact with the smart contracts we build in this series.
+
+Depending on the operating system and package manager you’re using, here’s how you can install Sui CLI on your computer:
+
+Execute this command to install Sui CLI on your terminal if you’re running a Unix-based operating system (macOS or Linux) via [Homebrew](https://brew.sh/).
+
+```bash [Terminal]
+brew install sui
+```
+
+Execute this command to install Sui CLI on your terminal if you’re running Windows via [Chocolatey](https://chocolatey.org/).
+
+```bash [Terminal]
+choco install sui
+```
+
+Do you have any of these package managers? You should get one. The overhead is less than taking [the Rust route](https://docs.sui.io/guides/developer/getting-started/sui-install#install-sui-binaries-from-source), and you’ll likely use one of these package managers in the future.
+
+After installing the Sui CLI client, execute this command to verify your installation.
+
+```bash [Terminal]
+sui --version
+
+# output: sui 1.40.1-homebrew
+```
+
+The command should output the version of Sui CLI you’ve installed and the installation source.
+
+Next, you’ll need an IDE to write smart contracts easily and on the fly. Considering it’s 2025, I advise downloading [Cursor](http://cursor.com) or [VSCode](https://www.notion.so/2025-The-Goodylili-Brand-165e61ac3cdb807298f9ecdbba5776f6?pvs=21) and getting an extension with AI capabilities.
+
+Unfortunately, I won’t recommend IntelliJ IDEs, although they’re my most used; there’s hardly comprehensive support for Move as much as you’ll get using VSCode, but the option is still open.
+
+### Useful Sui Development Resources
+
+I need you to be successful. There needs to be more of us, so I must point you to the right resources so that you can augment your learning and borrow more perspective.
+
+The most useful resources for reference are the [Sui Move documentation](https://docs.sui.io/concepts/sui-move-concepts) and the [Move Book](https://move-book.com/). Both are from Mysten Labs, and they were very useful in my journey.
+
+It’s the age of AI, you’ll probably be using it to make your work faster. I found the AI integration in the official Sui documentation helpful, followed by DeepSeek, Claude, and OpenAI’s models in that order.
+
+#### **Sui Tears**
+
+[Sui Tears by Interest Protocol](https://docs.interestprotocol.com/overview/deprecated/sui-tears) is a collection of open-source, ready-to-use smart contracts for multiple real-world use cases, including airdrops, DeFi, Governance, etc.
+
+#### **Mysten Labs’ Sui Examples**
+
+[Mysten Labs](https://github.com/MystenLabs/sui/tree/main/examples) also has an examples/ directory stacked with practical applications for Sui that you should check out. The examples don’t stop at smart contracts; there are also client-facing integrations.
+
+#### **Awesome Move**
+
+[Awesome Move](https://github.com/MystenLabs/awesome-move?tab=readme-ov-file#videos) is a collection of code and content from the Move community. Regardless of your learning style, you’ll find everything necessary to succeed as a Move developer here.
+
+#### **Everybody’s Codebase**
+
+You can [search GitHub](https://docs.github.com/en/search-github/github-code-search/understanding-github-code-search-syntax) for Move codebases and check out what Move devs are cooking. On the Github Search bar, use `language:Move`  and further filter to narrow results based on what you’re searching for.
+
+<img src="/move-github.png" alt="Move Search on GitHub" />
+
+#### The Move Package Registry
+
+The [Move Package Registry](https://www.moveregistry.com/) is the npmjs.com alternative for Sui Move projects. It is a place to share and discover Move packages.
+
+### Conclusion
+
+This was an intro article to set you up with tools and resources. Check out the following article to learn how to use the Sui CLI. I’ve outlined the most useful commands so you can use them as a cheat sheet.
+
+
+## Create and Deploy Coins on Sui
+
+Tokens are the most trendy thing to do on-chain. Of course, you have launch pads like Movepump, DoubleUp, and all the others that allow you to create tokens and deploy them with zero code, but you can only go so far with them.
+
+For more ergonomics and options, you’d need to create your tokens from scratch. This article will teach you how tokens are represented on Sui and how to launch tokens and make them tradable.
+
+### Getting Started: Launching and Deploying Tokens
+
+This article assumes you understand Sui Move and have already installed your development environment with an IDE and Sui CLI. If you don’t,  check out the first article to get set up.
+
+You’ll also need a Sui wallet. We’d be launching the token on the Sui mainnet so that you can trade it in real time across DEXs. You can deploy to any DEX, but in this case, we’d deploy to Aftermath (because it’s my favourite)
+
+### Sui’s Token Model
+
+Unlike other chains with a global key-value store or account-bound balances, Everything on Sui is an object.
+
+That design choice changes how you think about assets. It also gives you much more flexibility. Let’s marinate your point of view before launching tokens.
+
+On Sui, a token is just a `struct` defined in a package, wrapped with the `Coin<T>` type.
+
+```move [sui.move]
+struct MyToken has store {}
+```
+
+Once you declare it and register it on-chain, it becomes a usable coin type. Every `Coin<MyToken>` instance is an **object** on-chain with its own unique ID.
+
+Unlike traditional token standards (like ERC-20) that just keep balances, here every token is an *actual owned resource*.
+
+When a user holds 1000 `MyToken`, they’re not holding a “balance”—they have one or more `Coin<MyToken>` objects totalling 1000 units.
+
+You can merge, split, burn, or send them—because they’re owned objects, not just numbers in a map.
+
+#### Token Treasury and Metadata
+
+When you create a token, you’d use a treasury cap pattern to control token minting (the right to mint more tokens into the supply)/
+
+When you create a token, you generate a `(TreasuryCap<T>, Metadata)` tuple:
+
+```move [sui.move]
+let (treasury_cap, metadata) = coin=::create_currency<MyToken>(...);
+```
+
+Only the treasury cap holder can mint new tokens. You can transfer it to another wallet or lock it in a contract.
+
+No more tokens can ever be minted if it's lost or burned. This gives you fine-grained control over token economics and lifecycle.
+
+Sui separates token **logic** from **metadata: t**he display name, symbol, description, and image URL are stored in a separate `Object` of type `Metadata`.
+
+```move [sui.move]
+Metadata {
+  name: b"MyToken",
+  symbol: b"MTK",
+  description: b"A very serious token",
+  icon_url: b"https://example.com/logo.png"
+}
+```
+
+And since metadata is tied to the **type**, not individual objects, all `Coin<MyToken>` instances share the same metadata.
+
+Now that you understand the mechanics of Sui tokens, let’s create one immediately.
+
+### Creating a token on Sui
+
+First, set up your project if you haven’t done that already:
+
+```move [sui.move]
+sui move new goodylili
+cd goodylili
+code .
+```
+
+You’ll get a `sources/` folder and `Move.toml`. This is your token package.
+
+```move [sui.move]
+module impatient::goodylili;
+
+use sui::coin::{Self, TreasuryCap};
+use sui::url;
+```
+
+Now import these packages. You’ll use the `TreasuryCap` to manage the token's treasury cap and the URL package to add an image to the token.
+
+Now, create a coin instance like this:
+
+```move [sui.move]
+public struct GOODYLILI has drop {}
+```
+
+Your init function will take in the witness and transaction context and create a token with the `coin::create_currency` function.
+
+```move [sui.move]
+fun init(witness: GOODYLILI, ctx: &mut TxContext) {
+    // Create the icon URL
+    let icon_url = url::new_unsafe_from_bytes(b"https://framerusercontent.com/images/0KKocValgAmB9XHzcFI6tALxGGQ.jpg");
+    let decimals: u8 = 8;
+
+    // Fixed multiplier for 8 decimals (10^8)
+    let multiplier = 100000000; // 10^8
+
+    // Create the currency - make treasury mutable
+    let (mut treasury, metadata) = coin::create_currency(
+        witness,
+        decimals,
+        b"GOODYLILI",
+        b"GOODYLILI ON SUI",
+        b"Goodylili Taught Sui. Here's proof",
+        option::some(icon_url),
+        ctx,
+    );
+
+    // Mint 300 tokens (300 * 10^8 base units)
+    let initial_coins = coin::mint(&mut treasury, 300 * multiplier, ctx);
+    transfer::public_transfer(initial_coins, tx_context::sender(ctx));
+
+    transfer::public_freeze_object(metadata);
+    transfer::public_transfer(treasury, tx_context::sender(ctx));
+}
+```
+
+We’re minting and transferring some coins from the treasury to provide liquidity on Aftermath later. Why freeze the `metadata`? So that it’s not modifiable.
+
+You’d need to mint tokens duly, so it’s best to have a separate function you can call for that.
+
+```move [sui.move]
+public entry fun mint(
+    treasury_cap: &mut TreasuryCap<GOODYLILI>,
+    amount: u64,
+    recipient: address,
+    ctx: &mut TxContext,
+) {
+    let coin = coin::mint(treasury_cap, amount, ctx);
+    transfer::public_transfer(coin, recipient);
+}
+```
+
+In this case, after minting, we’ve sent the tokens to the specified address. The function is public, but only an address with the treasury cap can mint the tokens.
+
+Now that everything looks great, you can publish the package on chain with this command:
+
+```shell [Terminal]
+sui client publish --gas-budget 100000000
+```
+
+You should get the transaction details along with the coins’ package ID from the output of the transaction like this:
+
+![image.png](attachment\:aaf554c3-e7c4-4964-91ca-7189bcbad0c0\:image.png)
+
+That’s not where it ends. You need to deploy on a DEX to make your tokens tradable.
+
+### Deploying Sui Tokens on a DEX
+
+Deploying tokens on DEXs is easy. You have to pair them with any other tokens with a value.
+
+You will most likely want to do this with popular tokens like Sui or USDC, which have significant liquidity.
+
+First, visit the DEX. In this case, we’re deploying on Aftermath, so visit aftermath.finance, connect your wallet, and follow these steps.
+
+// video here
+
+That’s it, as you can see, you can now trade your tokens.
+
+### Conclusion
+
+You’ve learned how to create and deploy a coin from start to finish and get it trading on a DEX.
+
+Next, learn how you can do the same for NFTs with regular objects and Kiosks.
+
+
+## Building NFTs and Setting up Kiosks on Sui
+
+You want to launch an NFT collection on Sui? Great choice! Sui is one of the few blockchains where NFTs are alive. Sui NFTs are dynamic, and you can make them evolve.
+
+This article will guide you through the end-to-end process of launching an NFT collection on Sui. Ultimately, you should have an NFT that’s tradable on marketplaces.
+
+### Getting Started & Prerequisites
+
+This article assumes you understand Sui Move and have already installed your development environment with an IDE and Sui CLI. If you don’t,  check out this article to get set up
+
+Once you’re all set up, create a new project with this command:
+
+```bash [Terminal]
+sui move new <your project name>
+```
+
+Great, now add these imports to the top of the file where you’re writing your code:
+
+```move [sui.move]
+use std::string::{Self, String}; // work with strings
+use sui::url::{Self, Url}; // work with URLs
+use sui::event; // emit events
+use sui::balance::{Self, Balance}; // work with balances
+use sui::coin::{Self, Coin}; // work with coins
+```
+
+Now, let's get our hands dirty defining structs for our NFT
+
+### Building an NFT on Sui
+
+Before defining your structs, you need to understand your aim and your NFT collection's traits, habits, and features.
+
+In this tutorial, we want an NFT collection with life, so we’d give it an account. The NFT collection should be able to hold assets. This is great if you want to create an NFT collection with revenue or airdrops to holders.
+
+```move [sui.move]
+public struct GOODYLILI_NFT<phantom T> has key, store {
+    id: UID,
+    name: String,
+    rarity: u8,
+    description: String,
+    url: Url,
+    balance: Balance<T>
+}
+
+public struct NFTMinted has copy, drop {
+    rarity: u8,
+    nft_name: String,
+    description: String,
+    url: Url,
+}
+```
+
+The `GOODYLILI_NFT` struct represents the NFT collection with all the necessary fields, including a `balance` field. Notice that the struct has the `key` and `store` abilities.
+
+The `NFTMinted` struct is for emitting events whenever a new NFT is minted.
+
+Now, you’ll need an `init` function that will execute once to initialize traits and claim the publisher capability. The publisher capability allows you admin controls over the NFT collection.
+
+```move [sui.move]
+fun init(otw: GOODYLILI, ctx: &mut TxContext) {
+        let keys = vector[
+            utf8(b"name"),
+            utf8(b"description"),
+            utf8(b"image_url"),
+            utf8(b"rarity"),
+
+        ];
+
+        let values = vector[
+            utf8(b"name"),
+            utf8(b"description"),
+            utf8(b"image_url"),
+            utf8(b"rarity"),
+
+        ];
+
+        let publisher = package::claim(otw, ctx);
+
+        let mut display = display::new_with_fields<GOODYLILI_NFT<SUI>> (
+            &publisher, keys, values, ctx
+        );
+
+        display.update_version();
+
+        transfer::public_transfer(publisher, tx_context::sender(ctx));
+        transfer::public_transfer(display, tx_context::sender(ctx));
+    }
+```
+
+The `publisher` variable has this capability, and once the init function runs, it will be sent to the address that deploys the contract.
+
+You’ll also need a mint function to mint new NFTs into circulation. Here’s how to declare one.
+
+```move [sui.move]
+#[allow(lint(self_transfer))]
+public fun mint_to_sender<T: store>(
+    name: vector<u8>,
+    description: vector<u8>,
+    url: vector<u8>,
+    ctx: &mut TxContext,
+) {
+    let sender = ctx.sender();
+    let nft = GOODYLILI_NFT<T> {
+        id: object::new(ctx),
+        name: string::utf8(name),
+        description: string::utf8(description),
+        url: url::new_unsafe_from_bytes(url),
+        balance: balance::zero(), // Initialize with zero balance
+    };
+
+    event::emit(NFTMinted {
+        nft_name: string::utf8(name),
+        description: string::utf8(description),
+        url: url::new_unsafe_from_bytes(url),
+    });
+
+    transfer::public_transfer(nft, sender);
+}
+```
+
+All you needed to do was create a new instance of the struct. Cool right? Here, we are emitting an event with details of our minted NFT.
+
+Anybody should be able to fund the NFT’s account, so you’ll need to make the add function a public entry function.
+
+```move [sui.move]
+public entry fun add_balance<T: store>(
+    nft: &mut GOODYLILI_NFT<T>,
+    amount: u64,
+    payment: &mut Coin<T>
+){
+    let coin_balance = coin::balance_mut(payment);
+    let paid = balance::split(coin_balance, amount);
+    balance::join(&mut nft.balance, paid);
+}
+```
+
+The `coin_balance` is the balance of the `Coin<T>` passed in by the caller, stored in the object. Then, the `paid` is a split off the amount from the balance. The `balance::join` function joins the NFT’s balance with the amount paid.
+
+You’ll also need a function for holders to withdraw funds from the NFT.
+
+```move [sui.move]
+public entry fun withdraw_balance<T: store>(
+    nft: &mut GOODYLILI_NFT<T>,
+    amount: u64,
+    ctx: &mut TxContext
+    ) {
+        let withdrawn = coin::from_balance(
+            balance::split(&mut nft.balance, amount),
+            ctx
+        );
+
+        transfer::public_transfer(withdrawn, tx_context::sender(ctx));
+    }
+}
+```
+
+In this case, you’re using the `balance::split` function to split the amount from the NFT’s balance before sending the funds to the transaction sender.
+
+### Launching NFTs with Kiosk
+
+Sui provides kiosks that are more ergonomic than on-chain assets. It’s like opening a brand for items, and then you get to specify and enforce policies over the items.
+
+Many of your favourite NFT collections, including Prime Machin and Rootlets, use Kiosk.
+
+First, you need to add all these imports to your package.
+
+```move [sui.move]
+use sui::url::Url;
+use std::string::String;
+use sui::balance::Balance;
+use sui::sui::SUI;
+use sui::coin::{Self, Coin};
+use sui::balance;
+use sui::transfer_policy::{Self, TransferPolicy, TransferPolicyCap, TransferRequest};
+
+const E_INSUFFICIENT_AMOUNT: u64 = 0;
+```
+
+You’re importing the usual suspects: strings, coins, and balances plus `transfer_policy`, which is the real star of this section.
+
+The `transfer_policy` module defines **how assets can be transferred** and enforces rules on those transfers.
+
+Here’s a table of the transfer policy features:
+
+| Feature                | What it means                                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `TransferPolicy<T>`    | A shared object that defines the rules for transferring type `T`                                                                   |
+| `TransferPolicyCap<T>` | A capability (object) that lets you **modify** the policy — only the holder can change or add rules                                |
+| `TransferRequest<T>`   | An object created whenever someone tries to transfer type `T`. They must fulfill the policy rules before the transfer is finalized |
+| `add_rule(...)`        | Adds a custom rule (like “pay 1 SUI”) to the policy                                                                                |
+| `add_to_balance(...)`  | Lets you collect fees or payments tied to transfers                                                                                |
+| `add_receipt(...)`     | Marks a rule as fulfilled for a given transfer                                                                                     |
+| `confirm_request(...)` | Finalizes a transfer if **all** rules are met                                                                                      |
+
+Now that you understand the transfer policy. Let’s define the NFT struct and specify transfer policies on the NFT.
+
+```move [sui.move]
+public struct Art has key, store {
+    id: UID,
+    name: String,
+    url: Url,
+    balance: Balance<SUI>,
+}
+```
+
+We’ll need to define a **rule** and a **configuration t**o charge a fee or enforce conditions:
+
+```move [sui.move]
+public struct Rule has drop {}
+public struct Config has store, drop {}
+```
+
+This creates a new rule type, `Rule`, and an empty `Config`. We’ll plug this into the policy later.
+
+Here’s a basic function to mint a new `Art` NFT:
+
+```move [sui.move]
+/// Mint an NFT (for demo/testing)
+public fun mint(name: String, url: Url, ctx: &mut TxContext): Art {
+    Art {
+        id: object::new(ctx),
+        name,
+        url,
+        balance: balance::zero(),
+    }
+}
+```
+
+It creates a new object and assigns it a name, image, and zero token balance.
+
+Now we need to create a transfer policy like this:
+
+```move [sui.move]
+#[allow(lint(share_owned, self_transfer))]
+public fun create_policy(publisher: &sui::package::Publisher, ctx: &mut TxContext) {
+    let (policy, cap) = transfer_policy::new<Art>(publisher, ctx);
+    transfer::public_share_object(policy);
+    transfer::public_transfer(cap, tx_context::sender(ctx));
+}
+```
+
+Here’s what’s happening:
+
+* `transfer_policy::new` creates the policy and its capability (`cap`)
+* The policy is made **shared** so everyone can access it
+* The cap is **transferred** to the caller so only they can manage the policy
+
+This step is mandatory. Without a policy, Kiosk listings won’t be enforceable.
+
+Now, we can  attach the rule to the policy like this:
+
+```move [sui.move]
+public fun add_rule(
+    policy: &mut TransferPolicy<Art>,
+    cap: &TransferPolicyCap<Art>
+) {
+    transfer_policy::add_rule(Rule {}, policy, cap, Config {});
+}
+
+```
+
+This registers your custom rule (`Rule`) and its config. This function can only be called by whoever holds the `TransferPolicyCap`.
+
+Here’s the critical part: enforcing a **1 SUI transfer fee:**
+
+```move [sui.move]
+public fun pay(
+    policy: &mut TransferPolicy<Art>,
+    request: &mut TransferRequest<Art>,
+    coin: Coin<SUI>
+) {
+    assert!(coin::value(&coin) == 1_000_000_000, E_INSUFFICIENT_AMOUNT);
+    transfer_policy::add_to_balance(Rule {}, policy, coin);
+    transfer_policy::add_receipt(Rule {}, request);
+}
+```
+
+What’s happening here:
+
+* It checks the coin’s value is exactly **1 SUI** (in Mist)
+* Adds that payment to the policy’s internal balance
+* Marks the `TransferRequest` as passed for this rule
+
+Once all rules are satisfied, the buyer must **confirm the request**:
+
+```move [sui.move]
+public fun confirm(
+    policy: &TransferPolicy<Art>,
+    request: TransferRequest<Art>
+) {
+    transfer_policy::confirm_request(policy, request);
+}
+```
+
+The transfer is considered pending until this step is completed, and ownership won’t be finalized.
+
+This step is essential. Without calling `confirm_request()`, the item is stuck in limbo. That’s why TradePort asks recipients to claim from Kiosks.
+
+### Conclusion
+
+You now know how to launch NFTs on Sui. Ideally, you’ll need a decentralized storage to store your NFTs; check out Walrus for that.
+
+There’s a Walrus client tutorial in this series you should check out to learn how to store your NFTs on Walrus
+
+
+## Beyond the Basics of Move
+
+Once you understand the basics of Move programming, you can move on to Sui development. This article is a sequel to the Sui Move in 15 minutes article.
+
+In this article, you’ll learn the ergonomic aspects of Sui Move to write and publish production-ready smart contracts.
+
+### **Transaction Context**
+
+You can access the input arguments and the transaction context when anybody sends transactions to your contracts.
+
+You can use the context to fetch *who called it*, *when*, and *what’s happening*. That context is passed into your functions as `&mut TxContext`.
+
+```move [sui.move]
+public entry fun do_something(ctx: &mut TxContext) {
+    // use ctx here
+}
+```
+
+Here’s what you can access from the transaction context:
+
+```move [sui.move]
+struct TxContext has drop {
+    sender: address,             // who signed the transaction
+    tx_hash: vector<u8>,         // transaction hash
+    epoch: u64,                  // current epoch number
+    epoch_timestamp_ms: u64,     // epoch start timestamp (ms)
+    ids_created: u64             // how many new IDs created during this tx
+}
+```
+
+You never set these manually. Sui fills them in when the transaction runs.
+
+You’d often need to query what address is sending a transaction. Here’s how you can do that:
+
+```move [sui.move]
+public entry fun mint(ctx: &mut TxContext) {
+    let owner = tx_context::sender(ctx);
+}
+```
+
+Now you can access the sender’s address via the `owner` variable.
+
+### Module Initializers
+
+You’d need a module initializer to execute actions once e.g create a pool or assign special abilities.
+
+You’d declare an `init` function in the module, which runs automatically once published.
+
+```move [sui.move]
+fun init(ctx: &mut TxContext) { /* setup code here */ }
+```
+
+Your initializer function must be named `init`, private, return nothing, and optionally take in a one-time witness.
+
+```move [sui.move]
+fun init(otw: OTW, ctx: &mut TxContext) {
+
+ }
+```
+
+Here’s an `init` function with a one-time witness:
+
+```move [sui.move]
+fun init(otw: OTW, ctx: &mut TxContext) { /* with one-time witness */ }
+
+```
+
+Now, you need to understand witnesses and one-time witnesses.
+
+### **Capabilities**
+
+Capabilities are objects that give rights and resource access. No need for risky `if sender == admin` conditionals. If you’ve got the cap, you’re allowed.
+
+Here’s an example of a struct with capabilities.
+
+```move [sui.move]
+public struct AdminCap has key, store { id: UID }
+```
+
+> The convention is adding `Cap` as a suffix with the CamelCase.You typically mint the capability once, right when the module is published with a module initializer:
+
+```move [sui.move]
+fun init(ctx: &mut TxContext) {
+    transfer::transfer(
+        AdminCap { id: object::new(ctx) },
+        ctx.sender()
+    );
+}
+```
+
+The publisher receives the cap and becomes the admin. From there, they can set up the system or delegate the capability.
+
+The `init` function doesn’t stop someone from adding a new function that creates another cap later. Consider using a One-Time Witness or an un-upgradable package to enforce true one-time access.
+
+### **Witnesses**
+
+Capabilities are great for managing access, but what if you need *one-time* access to perform something sensitive, like initializing a global config, or minting a single admin cap that must *never* be duplicated? That’s where **witnesses** come in.
+
+A **witness** is a proof object passed into a function to prove that something happened before or didn’t happen.
+
+#### **One-Time Witness**
+
+The `One-Time Witness (OTW)` pattern enforces that certain code can only run once. It is perfect for ensuring that only one capability is created or that something can only be initialized during the first and only setup phase.
+
+```move [sui.move]
+fun init(otw: OTW, ctx: &mut TxContext) {
+    // only runs during publish
+    transfer::transfer(AdminCap { id: object::new(ctx) }, ctx.sender());
+}
+```
+
+Sui provides the OTW during the `publish` phase. If you try calling the function again later, there will be no witness and no dice.
+
+:::info
+Use OTW when you need strict one-time-only logic baked into your module.
+:::
+
+### Time Management on Sui
+
+Blockchains use epochs to track time deterministically and Sui is no different.
+
+You can access epoch-related info from the transaction context:
+
+```move [sui.move]
+let current_epoch = tx_context::epoch(ctx);
+let epoch_start_time = tx_context::epoch_timestamp_ms(ctx);
+```
+
+You can also use the `Clock` module for For millisecond-level accuracy.
+
+```move [sui.move]
+struct Clock has key {
+    id: UID,
+    timestamp_ms: u64, // current time in milliseconds
+}
+```
+
+First, you’ll have to import it from the `sui` library:
+
+```move [sui.move]
+use sui::clock::Clock;
+```
+
+You need to passed in `Clock`  as an immutable reference; then you can access the timestamp like this:
+
+```move [sui.move]
+use sui::clock::Clock;
+
+public fun current_time(clock: &Clock) {
+    let time = clock.timestamp_ms();
+    // ...
+}
+```
+
+You can build delayed token unlocks, time-limited auctions, expiring resources, etc.
+
+### Events
+
+You can emit events and listen to them to log specific data as they happen on-chain.
+
+How? You’ll define your own event structs, then use the built-in `event::emit` function.
+
+First, import the `event` module like this:
+
+```move [sui.move]
+use sui::event;
+```
+
+Now, you can emit events over your structs.
+
+```move [sui.move]
+public struct UserCreated has copy, drop {
+    user_id: address,
+}
+
+event::emit(UserCreated { user_id });
+```
+
+Events are off-chain observable. They don’t change state but are crucial for tracking contract activity and triggering app-side logic.
+
+### Error Handling
+
+You’re going to run into errors, and you’ll need to handle them. By default, when your Move function hits an abort!, it fails the transaction and returns a mod*ule name + error code. That’s helpful—until it isn’t*.
+
+```move [sui.move]
+public fun do_something() {
+    let field_1 = module_b::get_field(1); // may abort with 0
+    let field_2 = module_b::get_field(2); // may abort with 0
+    let field_3 = module_b::get_field(3); // may abort with 0
+}
+```
+
+If one of those calls fails with abort code `0`, you have **no idea** which one did it. That’s where better error-handling patterns come in.
+
+Instead of letting a function fail blindly, wrap it with checks. Constants come in handy here.
+
+First, define a constant for each error case:
+
+```move [sui.move]
+const E_NO_FIELD_A: u64 = 0;
+const E_NO_FIELD_B: u64 = 1;
+const E_NO_FIELD_C: u64 = 2;
+```
+
+Now you can add them to your assertions to narrow by your  error code:
+
+```move [sui.move]
+public fun assert_is_admin() {
+    assert!(is_admin(), ENotAuthorized);
+}
+```
+
+In this case, when the assertion fails, you know exactly what happened based on the error constants you defined:
+
+### Conclusion
+
+You’ve learned the Sui development-specific features to start building and deploying packages on chain.
+
+Next, launch a coin for your first project so everything makes sense and you can use what you’ve learned.
+
+
+## Learn Sui Move in 15 Minutes
+
+You want to learn Sui Move and start building really fast. I know what you are! You’re a developer who doesn’t have time for sentiments and wants to get shipping, especially since you’ve heard Move is easy peasy.
+
+This article will teach you everything you need to know to build and publish your first Sui smart contracts (programs) on the blockchain.
+
+### Packages
+
+You write programs that are grouped into packages to run on-chain. Every published package has an address. You can interact with packages by sending transactions that call the functions.
+
+Before we get our hands dirty, go to this article and follow the steps to set up Sui on your computer.
+
+Once you’re all set up, execute this command to create your first Sui project:
+
+```bash [Terminal]
+sui move new impatience
+```
+
+Now, enter into the directory and open it in your code editor of choice.
+
+```bash [Terminal]
+cd impatience
+code .
+```
+
+The command above enters the `impatience` directory and opens it in Visual Studio Code.
+
+When you open the package, you should expect to see this file directory loaded with some content in the file.
+
+<img src="/package-structure.png" alt="Package structure" />
+
+You’ll write your code in the `sources/` directory and tests in the `test/` directory. If there are any files you don’t want to include in your Git version control operations, you’ll include them in the `.gitignore` file. The `Move.toml` file is used to manage your packages and dependencies.
+
+#### Package Manifest (Move.toml)
+
+The `Move.toml` file is the manifest. It contains the package’s details and dependencies in TOML format, with different sections for each.
+
+<img src="/move-toml.png" alt="The Move.toml File" />
+
+In the \[package] section, you’ll define the package name (`impatient`) and the language edition (`2024.beta`). The `[dependencies]` section would have the external packages, e.g., the Sui package.
+
+Named addresses go under `[addresses]` to assign aliases like `zsh = "0x0"` to onchain addresses for easier referencing in Move code. Optional sections like `[dev-dependencies]` and `[dev-addresses]` allow you to customize test environments.
+
+### Addresses and Accounts
+
+Addresses are unique identifiers on the Sui blockchain. Sui uses addresses to identify packages, accounts, and objects.
+
+On Sui, addresses are case-sensitive, have a fixed byte size of 32 bytes, and are usually represented as hexadecimal with the `0x` prefix.
+
+<img src="/addresses.png" alt="Distinguishing addresses" />
+
+Sui differentiates between account addresses and contract addresses by using the package name at the end of the address.
+
+Some addresses are reserved for identifying standard packages and objects. T[he Move Book reference](https://move-book.com/appendix/reserved-addresses.html) has all of them.
+
+### Transactions
+
+Transactions are “actions” on the blockchain, such as calling functions, sending coins, or updating data. They can be anything that adds to or changes the state of data on the chain.
+
+Every transaction includes:
+
+* **Sender** – the account that signs and sends it
+* **Commands** – the list of actions to run, in order
+* **Inputs** – values or objects used in the commands
+* **Gas** – a coin used to pay for the transaction
+* **Gas budget/price** – how much will you pay to get it onchain?
+
+Transactions return the transaction digest, status, and details like what changes, the cost, and events.
+
+### Objects
+
+On Sui, everything is an object. The objects are stored directly on the user accounts for full control.
+
+These are the types of addresses:
+
+* **Owned Objects**: Owned objects, like your tokens and NFTs, have one owner. Only the owner can use and interact with them.
+* **Shared Objects**: These have multiple owners, e.g, liquidity pools.
+* Immutable Objects: They cannot be modified once they’re initialized.
+
+Every Sui object has:
+
+* **ID**: A unique identifier.
+* **Type**: Defines what kind of object it is.
+* **Owner**: Who owns the object (an address, another object, or shared).
+* **Version**: Tracks changes to the object.
+* **Last Transaction**: The most recent transaction that modified the object.
+
+You can add custom fields to objects to add features or new data.
+
+#### Publishing Packages Onchain
+
+Once you’re done writing your packages, you’ll need to publish them, and you can do that via the Sui CLI tool.
+
+First, you must build the package locally to ensure everything works.
+
+```bash [Terminal]
+sui move build
+```
+
+If there are no errors with your output, you’ve successfully built the package.
+
+If you’ve written tests, run them before publishing with this command:
+
+```bash [Terminal]
+sui move test
+```
+
+Once your test cases pass, you can publish them to any network (mainnet, testnet, localnet) with this command.
+
+```bash [Terminal]
+sui client publish --gas-budget <BUDGET_IN_MIST> <PACKAGE_NAME>
+
+# you can exempt the package name if it's your current working directory
+sui client publish --gas-budget 100000000
+```
+
+It would verify the dependencies on-chain and publish the package. You would then get many useful transaction data, including the package ID and the transaction digest.
+
+![image.png](attachment:8aaed66d-dd8c-484c-973f-03fcd62e11ed\:image.png)
+
+### Move Modules
+
+Modules are how you manage units of your packages. You can use them to isolate similar functionality.
+
+You’ll declare modules using lowercase and snake case. Module names must be unique throughout the package.
+
+```move [sui.move]
+module state::impatient;
+module state::paitient;
+```
+
+All your declarations (structs, functions, constants and imports) will enter the module.
+
+#### Importing Modules
+
+When working with multiple modules, you may need to import one module from another. Specifying the namespace with the `use` keyword works in this case:
+
+```move [sui.move]
+use sui::coin::{Self, Coin};
+```
+
+In this case, we’re importing the current module and the coin structure. When accessing items, you’ll specify `Self` without repeating the module name.
+
+You’ll need to add external dependencies to the dependencies section of your `Move.toml` file.
+
+```toml
+[dependencies.Pyth]
+git = "https://github.com/pyth-network/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "sui-contract-mainnet"
+```
+
+Then you can reference what you need to access with the `use` keyword.
+
+```move [sui.move]
+use pyth::price;
+```
+
+You’d have noticed that the `Sui` dependency has already been imported. You have access to those and automatically, the `std` module, which is the Move standard library.
+
+### Data Structures and Types
+
+Primitive types are your everyday data types. Sui Move supports:
+
+* `u8`, `u16`, `u32`, `u64`, `u128`, `u256` – Unsigned integers of various sizes. Pick one and stick to it unless you like debugging overflow errors.
+* `bool` – `true` or `false`.
+* `signer` – a special type that represents the person calling the function. You use this to prove identity and ownership.
+
+Here’s how you can assign variables on types with the operator `=` operation:
+
+```move [sui.move]
+let <variable_name>[: <type>]  = <expression>;
+
+// Unsigned integers
+let a: u8 = 255;
+let b: u64 = 1000000;
+let c: u128 = 999999999999999999;
+
+// Boolean values
+let is_active: bool = true;
+let is_zero: bool = false;
+
+// Address
+let user: address = @0x123;
+let system: address = @0x0;
+```
+
+The variables you’ve declared above are immutable (their values cannot change). If you need to change them, you’ll need to add the `mut` keyword in your definition.
+
+```move [sui.move]
+let mut <variable_name>[: <type>] = <expression>;
+```
+
+:::info
+You can't create a `signer` manually. The system passes that in when someone calls your code.
+:::
+
+### Conditionals
+
+Move has the classic `if`, `else if`, `else`. Here’s how you’ll use them:
+
+```move [sui.move]
+if health == 0 {
+    // do something
+} else if health < 20 {
+    // do something else
+} else {
+    // default case
+}
+```
+
+You can assign values conditionally, too:
+
+```move [sui.move]
+let y = if (x > 0) { 1 } else { 0 };
+```
+
+Both `if` and `else` branches must return the same type if you're assigning to a variable.
+
+You can use `assert!` to enforce rules at runtime:
+
+```move [sui.move]
+assert!(mana >= 10, 0);
+```
+
+This checks if the condition is true. If it is, execution continues as usual. If it **is not**, the program **aborts immediately** and throws an error with **code `0`**.
+
+### Loops
+
+You have `while` and `loop` repetitions:
+
+While loops run as long as the condition is true:
+
+```move [sui.move]
+let mut x = 0;
+while (x < 5) {
+    x = x + 1;
+}
+```
+
+Useful when you know the ending condition.
+
+On the other hand, `loop` runs forever (until you manually `break` out of it):
+
+```move [sui.move]
+let mut x = 0;
+loop {
+    x = x + 1;
+    if (x == 5) {
+        break;
+    }
+}
+```
+
+You can use the `break` and `continue` keywords to exit a loop and skip to another iteration respectively.
+
+```move [sui.move]
+loop {
+    x = x + 1;
+
+    if (x % 2 == 1) {
+        continue; // skip odd numbers
+    }
+
+    if (x == 10) {
+        break; // exit when x is 10
+    }
+}
+```
+
+Want to leave a function before reaching the end? Use the `return` keyword. More on that in a bit.
+
+### Structs
+
+Structs are how you declare custom types for whatever you’re building. You’ll declare a struct with the `struct` keyword with the name of the type and add fields like this:
+
+```move [sui.move]
+public struct Artist {
+    name: String,
+    age: u16,
+}
+```
+
+Structs are also private by default. You’ll need to make them public with the `public` visibility modifier as above.
+
+> Move does not support recursive structs so structs cannot encapsulate structs.Structs are more in Sui move, they also have abilities that define their behaviours e.g, adding any of the attributes means:
+
+* `copy` – can be copied.
+* `drop` – can be destroyed.
+* `store` – can be stored in memory.
+* `key` – can live on the blockchain as an object.
+
+Here’s how you can declare a struct with attributes:
+
+```move [sui.move]
+struct Counter has key {
+    value: u64,
+}
+```
+
+The `Counter` struct can now exist on-chain as an object with an ID itself.
+
+### Vectors
+
+Vectors are how you’ll express a list of items. They’re dynamic and shrinkable.
+
+```move [sui.move]
+let nums: vector<u64> = vector[1, 2, 3];
+```
+
+You’ll manipulate them using the `vector` module. It’s part of the standard library, so you don’t have to import it.
+
+```move [sui.move]
+vector::push_back(&mut nums, 4);
+let last_value = vector::pop_back(&mut nums);
+```
+
+The `push_back` method adds an element to the end of the vector, and the `pop_back` method removes the last element.
+
+### Collections
+
+You can go further with Vectors for more complex operations around a collection of items.
+
+### VecSet
+
+VecSet stores unique items, no duplicates. Very useful if you want to store addresses or unique IDs.
+
+You’ll have to import `VecSet` from the Sui library like this:
+
+```move [sui.move]
+use sui::vec_set::{Self, VecSet};
+```
+
+You can declare an empty set like this:
+
+```move [sui.move]
+let set = vec_set::empty<u8>(); // create an empty set
+```
+
+You can declare a VecSet field in a struct like this:
+
+```move [sui.move]
+public struct Airdrop has drop {
+    eligible: VecSet<address>
+}
+```
+
+VecSet will fail when an attempt is made to insert an existing item in the set.
+
+### VecMap
+
+You’d use VecMaps to store a collection of key-value pairs and access elements by their keys.
+
+> The keys must be unique. If they’re not, the old one get’s replaced, better not to try.VecMaps come in handy in cases where you want to map addresses to balances or anything of the sort.
+
+You’ll have to import `VecMap` from the Sui library like this:
+
+```move [sui.move]
+use sui::vec_map::{Self, VecMap};
+```
+
+You can declare an empty map like this:
+
+```move [sui.move]
+let mut map = vec_map::empty();
+```
+
+You can declare a VecMap field in a struct like this:
+
+```move [sui.move]
+public struct Allocations has drop {
+    x_username: String,
+    allocations: VecMap<address, u8>
+}
+```
+
+### Strings
+
+Strings in Move are *not* like JS or Python strings. They’re byte arrays with UTF-8 encoding in the `String` module.
+
+First, you’ll need to import the module and methods you need from the `string` library:
+
+```move [sui.move]
+use std::string::{Self, String};
+```
+
+Now you can use the `utf8` method to declare a string variable.
+
+```move [sui.move]
+let hello: String = string::utf8(b"Hello");
+```
+
+You can also declare strings with vector elements with the `to_string` method like this:
+
+```move [sui.move]
+let hello = b"Hello".to_string();
+```
+
+Now you can use these methods to interact with the strings.
+
+### Constants
+
+Need a value that never changes? Declare a constant with the `const` keyword:
+
+```move [sui.move]
+const MAX_SUPPLY: u64 = 1000000;
+```
+
+Constants must be compile-time evaluable. No funny business like calling functions or referencing state.
+
+### Option
+
+Options represent values that may not exist. You’ll encase the field type with `Option<Type>` to specify the field is optional.
+
+```move [sui.move]
+public struct User has drop {
+    first_name: String,
+    middle_name: Option<String>,
+    last_name: String,
+}
+```
+
+In this case, the `middle_name` field is optional. When the struct is initialized, it can contain a string value or remain empty.
+
+### Bags
+
+Bags are key-value stores with no rules. They are like a carry-everything collection, storing any value of any type.
+
+They come in handy when you don’t want to restrict value types or you need to store dynamic content that you’ll unpack later.
+
+You’ll need to import  bags to use them, like this:
+
+```move [sui.move]
+use sui::bag::{Self, Bag};
+```
+
+Then you can declare a bag as a variable or a struct field.
+
+```move [sui.move]
+use sui::bag::{Self, Bag};
+
+let mut bag = bag::new(ctx);
+
+public struct Carrier has key {
+    id: UID,
+    bag: Bag,
+}
+```
+
+You can use methods on your Bag variables or fields, like this:
+
+```move [sui.move]
+bag.add(b"name", string::utf8(b"Ada"));
+```
+
+In this case, you’ve added a key-value pair to the bag  the string in the bag using the `my_key` key with the `borrow` method.
+
+### Tables
+
+Tables are an underrated data structure in Sui Move. Similar to bags, they’re strict; you’d need to specify the types in the table beforehand, and they’d be enforced on every entry.
+
+Here’s how you’ll import tables from the Sui package:
+
+```move [sui.move]
+use sui::table::{Self, Table};
+```
+
+Now you can declare your tables like this:
+
+```move [sui.move]
+let mut table: Table<K, V> = table::new<K, V>(ctx);
+
+public struct UserRegistry has key {
+    id: UID,
+    table: Table<address, String>,
+}
+```
+
+You can populate your tables with the `add` method like this:
+
+```move [sui.move]
+let mut table: Table<address, String> = table::new<address, String>(ctx);
+
+table.add(@0x123, string::utf8(b"Alice"));
+```
+
+In this case, we’ve declared a table that maps addresses to strings before adding an entry using the `add` method.
+
+### Functions and Methods
+
+You have functions for defining reusable logic. You’ll declare them in Move modules like this:
+
+```move [sui.move]
+fun greet():   {
+    string::utf8(b"Hello, Sui!")
+}
+```
+
+In this case, the `greet()` function returns a String.
+
+Functions can take in parameters and return multiple parameters as well.
+
+```move [sui.move]
+fun add(a: u64, b: u64): (u64, u64) {
+    (a + b, b - a)
+}
+```
+
+Functions are private by default. If you want external modules or
+
+You can write functions operating on structs as methods by making the struct the first parameter, like this:
+
+```move [sui.move]
+public struct Hero has drop {
+    health: u8,
+}
+
+public fun heal(self: &mut Hero) {
+    self.health = self.health + 10;
+}
+
+// Usage
+let mut hero = Hero { health: 100 };
+hero.heal();
+```
+
+This defines a `Hero` struct as a `health` field and a `heal`ing function that increases that health.
+
+Because the `heal` function takes `&mut Hero` as the first argument and is defined in the same module, you can call it using method syntax like `hero.heal();`. It's just syntactic sugar—the compiler rewrites it as `heal(&mut hero)` under the hood.
+
+### **Memory Management & Ownership**
+
+Move is built with Rust, so the ownership and borrowing primitives are valid, and they play nicely too, especially since you’re working with assets.
+
+In Move, variables aren’t copied by default—they’re **moved**.
+
+```move [sui.move]
+let name = string::utf8(b"Ada");
+let name2 = name; // name is now invalid
+```
+
+The value moved into `name2`, and `name` is no longer usable unless the type has the `copy` ability.
+
+Want to reuse a value without moving it? Borrow it:
+
+```move [sui.move]
+let ref_name = &name;        // read-only borrow
+let mut_ref = &mut name2;    // mutable borrow
+```
+
+You can have multiple immutable borrows, or one mutable borrow, but not both simultaneously.
+
+### Generics
+
+Generics are available for defining fields and variables that work with any type.
+
+```move [sui.move]
+struct Wrapper<T> has store {
+    value: T,
+}
+```
+
+You can now create a `Wrapper<u64>`, a `Wrapper<String>`, or whatever else.
+
+Here’s how you’ll initialize a generic struct:
+
+```move [sui.move]
+let wrapped_number = Wrapper { value: 42 };
+let wrapped_text = Wrapper { value: string::utf8(b"hello") };
+```
+
+Just ensure the type you're wrapping has the right abilities (like `store`) or the compiler will yell at you.
+
+### Conclusion
+
+You’ve learnt the basics of Sui Move, enough for you to get your hands dirty. You’re now a Sui developer.
+
+Next is an advanced variant of this article where we’ll delve into smart contract specifics to help you build your first project.
+
+
+## Sui & Move Overview
+
+Move is the secure and resource-oriented programming language  for building on the Sui blockchain. It’s designed to manage digital assets safely and efficiently, giving developers fine-grained control over how assets are created, transferred, and stored.
+
+<iframe width="100%" height="350" src="https://www.youtube.com/embed/ItHXDdyZ_s0" title="Sui Blockchain vs Traditional Blockchain" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen />
+
+Originally developed by Meta for Diem, Move was adopted and evolved by Mysten Labs to power Sui, a high-performance Layer 1 blockchain built for speed, scalability, and smart contract safety.
+
+Unlike traditional programming languages that treat data like generic variables, Move introduces a new concept: ***resources***. In Move, resources are first-class citizens; they can’t be copied or accidentally dropped.
+
+```move [vanilla.move]
+module 0x0::TokenExample {
+    use std::signer;
+
+    struct Token has key {
+        value: u64
+    }
+
+    public fun create(account: &signer, amount: u64) {
+        move_to(account, Token { value: amount });
+    }
+
+    public fun get_value(addr: address): u64 acquires Token {
+        borrow_global<Token>(addr).value
+    }
+}
+```
+
+This is cool because assets like NFTs or tokens are handled with cryptographic-level safety.
+
+Instead of garbage collection or manual memory management, Move uses *ownership* and *move semantics*. Each value in Move has exactly one owner at a time, and when that value is moved, the original reference becomes invalid.
+
+This avoids double-spends and dangling references—two common bugs in smart contract development.
+
+### Sui Move Extends on Move
+
+<img src="/move-evolution.png" alt="Move Evolution" />
+
+Sui Move is a variant of Move (different from the original version). Sui Move extends the core Move language with new features like object-centric programming.
+
+On Sui, everything is treated as an object with a unique ID—a coin, a smart contract, or a game item. These objects live on-chain and can be passed between users, upgraded, or mutated using Move functions called *entry functions*.
+
+```move [sui.move]
+module sui_example::token {
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
+
+    struct Token has key, store {
+        id: UID,
+        value: u64
+    }
+
+    public entry fun create(value: u64, ctx: &mut TxContext) {
+        let token = Token {
+            id: object::new(ctx),
+            value
+        };
+        transfer::public_transfer(token, tx_context::sender(ctx));
+    }
+}
+```
+
+To get started with Sui Move, install the Sui CLI and initialize a new project with `sui move new`. Write your modules in `.move` files and define structs, functions, and resources.
+
+Use the `entry` keyword to declare public entry points for your smart contracts. Then compile your code with `sui move build` and test it locally before deploying.
+
+Sui Move has a powerful standard library and frameworks for handling complex operations, from capability-based access control to programmable transactions.
+
+You’re ready to  build a secure, asset-centric smart contract on one of the fastest blockchains. That’s Sui Move in 100 seconds.
+
+
+## Advanced Sui TypeScript SDK Operations
+
+You’re most likely building the frontend for your Sui, and you want to improve efficiency as you do so, so this article is for you.
+
+Here, you’ll learn production-centric operations to ship frontends and backends that interact with the Sui blockchain.
+
+### Getting Started with Sui & TypeScript
+
+This is not the first or introductory piece I’m working on for Sui and TypeScript. If you need to get some basics to get more comfortable, please check out [this introductory article](https://dev.to/goodylili/how-to-use-the-sui-typescript-sdk-2dep) on the Sui TypeScript SDK.
+
+Install the Sui TypeScript SDK in your project with this command:
+
+```bash [Terminal]
+npm i @mysten/sui.js
+```
+
+Now that you’re good to go, let’s start with programmable transactions, one of Sui's special features.
+
+### Programmable Transactions Blocks
+
+Programmable transaction blocks (PTB) allow you to combine multiple transactions into one block and execute them.
+
+Add these imports to your projects, let us send a programmable transaction.
+
+```tsx [index.ts]
+import { Transaction } from '@mysten/sui/transactions';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+```
+
+In this programmable transaction, I want to split a coin and send them to multiple recipients all in one transaction.
+
+First, I’ll have to create the transaction keypair and define a new transaction instance for the programmable transaction.
+
+```tsx [index.ts]
+async function main() {
+    // Initialize client
+    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+
+    // Create a keypair from your secret
+    const keypair = Ed25519Keypair.fromSecretKey(
+        'suiprivkey1qq9r6rkysny207t5vr7m5025swh7w0wzra9p0553paprhn8zshqsx2rz64r'
+    );
+
+    // Create a single new programmable transaction
+    const tx = new Transaction();
+
+    // Define multiple transfers and the amounts
+    const transfers = [
+        { to: '0x83ecd81fdd132d4fb4f9ae2608656b000df13c4c3c5b10490d48ee981bc8f433', amount: 500000 },
+        { to: '0x1b2e893cb5164f2f48bd65f77ea76c14d025d8577ab89f2b40a7af0376a8584c', amount: 50000 },
+    ];
+```
+
+Now, we need to split the gas coin int multiple amounts for transfer with the `splitCoins` function like this.
+
+```tsx [index.ts]
+
+// Split gas coin into exact amounts for transfers
+    const coins = tx.splitCoins(
+        tx.gas,
+        transfers.map((transfer) => transfer.amount)
+    );
+
+    // Transfer each split coin to its corresponding address
+    transfers.forEach((transfer, index) => {
+        tx.transferObjects([coins[index]], transfer.to);
+    });
+
+    // Sign and execute the entire programmable transaction
+    const result = await client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+    });
+
+    console.log('Transaction executed successfully.');
+    console.log('Execution result:', result);
+}
+
+main().catch(console.error);
+```
+
+The `transfers.forEach` makes the transfers to each recipient and then you’ll sign the programmable transaction with the `signAndExecuteTransaction` function by passing in the keypair and the transaction you’ve built.
+
+<img src="/programmable.png" alt="Programmable Transactions on Explorer" />
+
+### Gas Management on Sui
+
+By default, your transaction uses one of your owned SUI coins as the gas coin. The Sui TypeScript SDK automatically selects a coin not otherwise used in your transaction inputs. However, you can customize gas handling for special cases like sponsored transactions.
+
+#### Standard Gas Payments
+
+You can explicitly control the gas settings on a transaction:
+
+Set a custom gas price:
+
+```tsx [index.ts]
+tx.setGasPrice(gasPrice);
+```
+
+Set a custom gas budget:
+
+```tsx [index.ts]
+tx.setGasBudget(gasBudgetAmount);
+```
+
+Specify exactly which coins to use as gas payment:
+
+```tsx [index.ts]
+tx.setGasPayment([{ objectId, version, digest }]);
+```
+
+When splitting coins or transferring tokens, you can reuse the gas coin itself as input, because it can be used **by reference** multiple times safely inside the same transaction block.
+
+If you want to transfer your entire gas coin (send your full balance), you can simply:
+
+```tsx [index.ts]
+tx.transferObjects([tx.gas], '0xRecipientAddress');
+```
+
+This will move your SUI to the recipient and consume the gas object.
+
+#### Sponsored Gas (Gasless Transactions)
+
+In a sponsored transaction, another account (the **sponsor**) pays for the gas fees instead of the original sender.
+
+Here’s a typical example of sending a coin to a recipient where the sender pays for gas.
+
+```tsx [index.ts]
+import { Transaction } from '@mysten/sui/transactions';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+
+async function userPaysForGas() {
+  const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+
+  // Use your provided main keypair
+  const keypair = Ed25519Keypair.fromSecretKey(
+    'suiprivkey1qq9r6rkysny207t5vr7m5025swh7w0wzra9p0553paprhn8zshqsx2rz64r'
+  );
+
+  const tx = new Transaction();
+  tx.setSender(keypair.getPublicKey().toSuiAddress());
+
+  tx.setGasBudget(50_000_000);
+  tx.setGasPrice(1000);
+
+  const [coin] = tx.splitCoins(tx.gas, [1_000_000]);
+  tx.transferObjects([coin], '0xRecipientAddressHere'); // Change this to your target address
+
+  const result = await client.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: tx,
+  });
+
+  console.log('User-paid transaction successful with digest:', result.digest);
+}
+
+userPaysForGas().catch(console.error);
+```
+
+In this case, the sender is automatically paying, but what if you want another account to pay the gas? Here’s how you’d implement that.
+
+```tsx [index.ts]
+import { Transaction } from '@mysten/sui/transactions';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+
+async function sponsoredTransaction() {
+    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
+
+    // User's main keypair (your provided key)
+    const userKeypair = Ed25519Keypair.fromSecretKey(
+        'suiprivkey1qq9r6rkysny207t5vr7m5025swh7w0wzra9p0553paprhn8zshqsx2rz64r'
+    );
+
+    // Sponsor keypair (your provided key)
+    const sponsorKeypair = Ed25519Keypair.fromSecretKey(
+        'suiprivkey1qr3dtpdvecp2usjah06uyw8d8jvx9syqykxlu5x45cymq8lxn7hz2cqpwte'
+    );
+
+    // Build the user's transaction
+    const tx = new Transaction();
+    tx.setSender(userKeypair.getPublicKey().toSuiAddress());
+
+    const [coin] = tx.splitCoins(tx.gas, [1_000_000]); // Split 0.001 SUI
+    tx.transferObjects([coin], '0x83ecd81fdd132d4fb4f9ae2608656b000df13c4c3c5b10490d48ee981bc8f433');
+
+    // Build KIND bytes (no gas owner yet)
+    const kindBytes = await tx.build({
+        client,
+        onlyTransactionKind: true,
+    });
+
+    // Sponsor modifies transaction
+    const sponsoredTx = Transaction.fromKind(kindBytes);
+
+    sponsoredTx.setSender(userKeypair.getPublicKey().toSuiAddress());
+    sponsoredTx.setGasOwner(sponsorKeypair.getPublicKey().toSuiAddress());
+
+    // Build final transaction bytes
+    const builtBytes = await sponsoredTx.build({ client });
+
+    // ✍️ User signs first
+    const { signature: userSignature } = await userKeypair.signTransaction(builtBytes);
+
+    // ✍️ Sponsor signs
+    const { signature: sponsorSignature } = await sponsorKeypair.signTransaction(builtBytes);
+
+    // 🚀 Execute with both signatures
+    const result = await client.executeTransactionBlock({
+        transactionBlock: builtBytes,
+        signature: [userSignature, sponsorSignature], // ✅ Two signatures required
+        options: {
+            showEffects: true,
+            showEvents: true,
+        },
+    });
+
+    console.log('✅ Sponsored Transaction Successful!');
+    console.log('Digest:', result.digest);
+}
+
+sponsoredTransaction().catch(console.error);
+```
+
+We  build the transaction into kind bytes using `tx.build({ onlyTransactionKind: true })` so no gas owner is assigned yet.
+
+Next, we reload the transaction using `Transaction.fromKind(kindBytes)`, set the sender again with `sponsoredTx.setSender()`, and assign the sponsor as the gas payer with `sponsoredTx.setGasOwner()`.
+
+After building the final transaction bytes using `sponsoredTx.build({ client })`, both the user and the sponsor sign the transaction with `signTransaction()`, and finally, we submit the transaction along with both signatures using `client.executeTransactionBlock()`.
+
+On the explorer you’d be able to see that it’s a sponsored transaction like this:
+
+<img src="/sponsored.png" alt="sponsored Transactions on Explorer" />
+
+### Calling Smart Contracts
+
+You’ll use the `moveCall` function inside your transaction to call any Move function on-chain.
+
+First, make sure you have your imports set:
+
+```tsx [index.ts]
+import { Transaction } from '@mysten/sui/transactions';
+```
+
+Here’s how you can call a Move function:
+
+```tsx [index.ts]
+const tx = new Transaction();
+tx.moveCall({
+  target: '0x2::devnet_nft::mint',
+  arguments: [
+    tx.pure.string('NFT Name'),
+    tx.pure.string('NFT Description'),
+    tx.pure.string('https://link-to-your-nft-image.com'),
+  ],
+});
+```
+
+After you add your `moveCall`, you can sign and execute the transaction like before.
+
+### Conclusion
+
+You’ve learned more advanced, development-centric functions you’ll probably use if you’re building on Sui.
+
+Now, you can go ahead and start building more sophisticated full stack apps on Sui
+
+
+## Sui & TypeScript SDK Basics
+
+Sui is the chain of the moment, and although Move is the holy grail for writing smart contracts on Sui, the TypeScript support is significant. You can interact with and use Sui and most of the DeFi apps on the ecosystem with TypeScript.
+
+In this tutorial, I’ll teach you how to interact with the Sui network via TypeScript. You’ll learn how to read the state of the blockchain, write transactions to the chain from your TypeScript programs.
+
+### Getting Started With Sui and TypeScript
+
+The only prerequisite is that you’ll need basic JS/TS knowledge to run this tutorial smoothly. I’ll walk you through everything else.
+
+First, create a new TypeScript project in your terminal and initialize a new Node.js project.
+
+```bash [Terminal]
+mkdir SuiTS
+cd SuiTS
+npm init -y
+```
+
+Install TypeScript as a development dependency if you don’t have it already.
+
+```bash [Terminal]
+npm install typescript --save-dev
+npm install ts-node //runs TS without the need for transpiling
+```
+
+Now, you can initialize a new TypeScript project. This command will create a `tsconfig.json` file with default options that you can customize for your project.
+
+```bash [Terminal]
+npx tsc --init
+```
+
+Open the `tsconfig.json` and paste these configurations.
+
+```json [tsconfig.json]
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "resolveJsonModule": true
+  },
+  "exclude": ["node_modules"],
+
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  }
+}
+```
+
+Create a `src` directory where you’ll add your TypeScript files.
+
+```bash [Terminal]
+mkdir src
+touch src/index.ts
+```
+
+Finally, install the Sui TypeScript SDK with this command.
+
+```bash [Terminal]
+npm i @mysten/sui.js
+```
+
+You’re all set. You can start writing TypeScript programs that interact with the Sui blockchain.
+
+### Connecting to the Sui Blockchain
+
+You must connect to a Sui blockchain to interact with the chain.
+
+First, import `getFullnodeUrl` and `SuiClient` from the SDK client module.
+
+```bash [Terminal]
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+```
+
+Now, depending on your desired connection, you can use `getFullnodeUrl` to retrieve the full node URL of the Sui testnet, mainnet, localnet, or devnet; then, use the `SuiClient` to connect to the client instance.
+
+```tsx [index.ts]
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+
+const rpcUrl = getFullnodeUrl('mainnet');
+
+const client = new SuiClient({ url: rpcUrl });
+```
+
+To test your connection, You can use the `getLatestSuiSystemState` to retrieve the latest state of the network.
+
+```tsx [index.ts]
+// index.ts
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+
+const rpcUrl = getFullnodeUrl("mainnet");
+
+const client = new SuiClient({ url: rpcUrl });
+
+async function getNetworkStatus() {
+    const currentEpoch = await client.getLatestSuiSystemState();
+    console.log(currentEpoch)
+}
+
+getNetworkStatus();
+```
+
+Now, transpile the TypeScript code to JavaScript and run it with this command:
+
+```bash [Terminal]
+ts-node index.ts
+```
+
+You should expect an output similar to this when you execute the command.
+
+![typescript-setup-output](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/b6hdtnnms7stcmxwzs9b.png)
+
+### Creating a Sui Wallet
+
+Creating a wallet is another popular operation that might be handy if you build on the Sui Network.
+
+Here’s how to generate Sui wallet keypairs and retrieve the private and public keys from the Keypair.
+
+```tsx [index.ts]
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+
+const rpcUrl = getFullnodeUrl("mainnet");
+
+const client = new SuiClient({ url: rpcUrl });
+
+// random Keypair
+const keypair = new Ed25519Keypair();
+
+const publicKey = keypair.getPublicKey();
+const privatekey = keypair.getSecretKey();
+
+console.log(privatekey.toString());
+console.log(publicKey.toSuiAddress());
+```
+
+The `Ed25519Keypair` function creates a new key pair. The `getPublicKey` and `getPrivateKey` methods give you access to the public and private keys, respectively.
+
+Here’s the string output of the private and public keys I generated with the program:
+
+```
+suiprivkey1qq9r6rkysny207t5vr7m5025swh7w0wzra9p0553paprhn8zshqsx2rz64r
+New Sui Address: 0xbd46d7582ced464ef369114252704b10317436ef70f196a33fcf2c724991fcba
+```
+
+I’m funding this wallet with 0.25 Sui for the next set of operations. Feel free to verify and scan the wallet. Do not send any funds; it’s just a dummy wallet.
+
+### Reading Sui Wallet Balances
+
+You can use the `getCoins` function on your client instance to retrieve details on the coins in a wallet address.
+
+```tsx [index.ts]
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+
+// use getFullnodeUrl to define the Devnet RPC location
+const rpcUrl = getFullnodeUrl('mainnet');
+
+// create a client connected to devnet
+const client = new SuiClient({ url: rpcUrl });
+
+async function getOwnedCoins() {
+    const coins = await client.getCoins({
+        owner: '0xbd46d7582ced464ef369114252704b10317436ef70f196a33fcf2c724991fcba',
+    });
+    console.log(coins);
+}
+
+getOwnedCoins();
+```
+
+The function returns details on the Sui coin alone and the details. The output is in MIST, the Sui gas token. 1 SUI equals 1 billion MIST.
+
+![wallet-balance-details](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/gxxlj9pyd3akc93zpo78.png)
+
+The getAllCoins function can be used in the same way to get a list of all the coins in a wallet.
+
+```tsx [index.ts]
+async function getAllCoins() {
+    // Get the list of owned coins (tokens) for the given owner address
+    const ownedCoins = await client.getAllCoins({ owner: "0xbd46d7582ced464ef369114252704b10317436ef70f196a33fcf2c724991fcba" });
+
+    // Access the coin data
+    const coins = ownedCoins.data;
+
+    // Iterate through the coins and print their details
+    for (const coin of coins) {
+        console.log(`Coin Type: ${coin.coinType}`);
+        console.log(`Coin Object ID: ${coin.coinObjectId}`);
+        console.log(`Balance: ${coin.balance}`);
+        console.log('--------------------');
+    }
+
+    // If there is more data, handle pagination
+    if (ownedCoins.hasNextPage) {
+        console.log('More data available. Fetching next page...');
+        // You can handle the next page using ownedCoins.nextCursor if needed
+    }
+}
+
+getAllCoins();
+```
+
+For this example, I traded some Sui for $FUD on Hop Aggregator, and here’s the output after running the program.
+
+![listing-all-balances](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/amc6xxd0fnhgtv5qd556.png)
+
+### Send Coins or Objects
+
+Finally, the interesting part is that you’ll learn to send transactions on the blockchain.
+
+Let’s send some $FUD tokens to another wallet. This works for any coins on the Sui Network.
+
+```tsx [index.ts]
+import {getFullnodeUrl, SuiClient} from '@mysten/sui/client';
+import {Ed25519Keypair} from '@mysten/sui/keypairs/ed25519';
+import {Transaction} from '@mysten/sui/transactions';
+
+// Set the RPC URL to connect to the Sui mainnet
+const rpcUrl = getFullnodeUrl("mainnet");
+
+const client = new SuiClient({url: rpcUrl});
+
+// Create the keypair using the private key
+const keypair = Ed25519Keypair.fromSecretKey("suiprivkey1qq9r6rkysny207t5vr7m5025swh7w0wzra9p0553paprhn8zshqsx2rz64r");
+
+// FUD coin type
+const FUD_TYPE = '0x76cb819b01abed502bee8a702b4c2d547532c12f25001c9dea795a5e631c26f1::fud::FUD';
+
+async function sendFUD() {
+    const tx = new Transaction();
+
+    // Fetch FUD coins owned by the sender
+    const coins = await client.getCoins({owner: keypair.getPublicKey().toSuiAddress(), coinType: FUD_TYPE});
+
+    if (coins.data.length === 0) {
+        console.log("No FUD coins found in the wallet.");
+        return;
+    }
+
+    // Choose the first available FUD coin and split it for the transfer (adjust amount if needed)
+    const [coin] = tx.splitCoins(coins.data[0].coinObjectId, [100000000]);
+
+    tx.transferObjects([coin], '0xb0042cf2c5a16d0a240fc1391d570cd5fe06548f860583f1878c327db70f2a22');
+
+    const result = await client.signAndExecuteTransaction({signer: keypair, transaction: tx});
+    await client.waitForTransaction({digest: result.digest});
+
+    console.log("Transaction successful. Digest:", result.digest);
+}
+
+sendFUD().then(console.log).catch(console.error);
+```
+
+First, I checked that the wallet had some $FUD and split it for the transfer. The `tx.transferObjects` transfer the split coin to the specified address.
+
+Finally, you need to sign the transaction with the `client.signAndExecuteTransaction`, and you can wait for the transaction with `waitForTransaction` to confirm the transaction went through
+
+### Conclusion
+
+You’ve learned to interact with the Sui blockchain using the official TypeScript SDK. There’s so much you can build on Sui with your newly acquired knowledge, such as building wallets and bots.
+
+You can take this further by learning how to interact with Move contracts on Sui to build more sophisticated dApps
+
+
+## Build a Wallet Evacuation Package
+
+Have you ever wanted to send multiple assets to another wallet or totally evacuate a wallet because you think you’re at risk of a drainer?
+
+I haven’t come across a tool or wallet that allows you to do this, but it’s really useful, so why not build one on Sui now?
+
+### Building the Evacuation Package
+
+Once you have your project setup, define the module at the top of your Move file like this:
+
+```move [sui.move]
+module rendevous::evacuate;
+```
+
+Now import the `Coin` module like this:
+
+```move [sui.move]
+use sui::coin::Coin;
+```
+
+Feel free to define custom errors:
+
+```move [sui.move]
+const E_LENGTH_MISMATCH: u64 = 0;
+```
+
+You’ll use this to  catch cases where the user provides a mismatched number of coins and amounts.
+
+Here’s the function signature for the evacuation. The function takes in the recipient address, a vector of the coins and the amounts you want to send for each, and the transaction context.
+
+```move [sui.move]
+public entry fun evacuate_wallet<T: store>(
+    recipient: address,
+    mut coins: vector<Coin<T>>,
+    amounts: vector<u64>,
+    ctx: &mut TxContext,
+)
+```
+
+Now, you’d have to make sure the lengths of the vectors match like this:
+
+```move [sui.move]
+{
+    let num_coins = vector::length(&coins);
+    let num_amounts = vector::length(&amounts);
+    assert!(num_coins == num_amounts, E_LENGTH_MISMATCH);
+```
+
+Now, the core evaluation functionality!  You could go through each coin, split the amount to send, transfer both the split and leftover to the recipient, and clean up the original coin vector.
+
+```move [sui.move]
+ {
+    let num_coins = vector::length(&coins);
+    let num_amounts = vector::length(&amounts);
+    assert!(num_coins == num_amounts, E_LENGTH_MISMATCH);
+
+    let mut i = 0;
+    while (i < num_coins) {
+        let mut coin = vector::pop_back(&mut coins);
+        let amount = *vector::borrow(&amounts, i);
+        let portion = sui::coin::split(&mut coin, amount, ctx);
+        transfer::public_transfer(portion, recipient);
+        transfer::public_transfer(coin, recipient);
+        
+        i = i + 1;
+    };
+
+    vector::destroy_empty(coins);
+}
+```
+
+You have to destroy the original coin vector because in Sui Move, a **`vector<Coin<T>>`** does **not** have the **`drop`** ability (since **`Coin<T>`** itself does not have **`drop`**).
+
+Now build the package to make sure everything works as expected:
+
+```move [sui.move]
+sui move build
+```
+
+You can execute this command to publish the package to a Sui network.
+
+```move [sui.move]
+sui client publish --gas-budget 100000000
+```
+
+Execute this command to evacuate or send multiple coins to a wallet:
+
+```move [sui.move]
+sui client call \
+  --package <PACKAGE_ID> \
+  --module evacuate \
+  --function evacuate_wallet \
+  --args <RECIPIENT_ADDRESS> \
+         '[<COIN_ID_1>, <COIN_ID_2>, ...]' \
+         '[<AMOUNT_1>, <AMOUNT_2>, ...]' \
+  --type-args <TOKEN_TYPE> \
+  --gas-budget 100000000
+```
+
+Replace the placeholders:
+
+* `<PACKAGE_ID>` – your published package ID.
+* `<RECIPIENT_ADDRESS>` – the address you’re evacuating to.
+* `<COIN_ID_1>...` – the object IDs of the coins you’re transferring.
+* `<AMOUNT_1>...` – the exact amount to transfer from each coin.
+* `<TOKEN_TYPE>` – the type of the token (e.g., `0x2::sui::SUI` or your custom coin).
+
+Your tokens should all be sent in one transaction, and you’ll surely save on gas.
+
+### Conclusion
+
+If you ever need to send out multiple assets from a single wallet, you know how to go around it.
+
+Up next is clients because you’re definitely not shipping CLI commands to users.
+
+
+## Let’s Deploy a Walrus Site
+
+Crypto’s centralized facets have most of their frontends on Web2 servers and services, and that's a pretty big deal. What if the entire stack could be decentralized?
+
+That’s the problem Walrus solves. Now you can deploy any static website to Walrus and harness all the benefits of decentralization. This article will teach you how to deploy a Walrus site.
+
+### Installing Walrus Site Builder
+
+First, you’ll need to get set up with Walrus. I recommend installing via the CLI commands, especially if you’re on a Mac, because I ran into an issue trying to install it on my Mac.
+
+You will likely deploy your Walrus site on Mainnet, so execute this command to install the Walrus CLI tool and then the website builder for mainnet.
+
+Execute this command to install the latest Walrus mainnet version:
+
+```bash
+curl -sSf https://docs.wal.app/setup/walrus-install.sh | sh
+```
+
+You’ll need to add the `walrus` binary to your PATH. Also, you need to download the latest Walrus cofigurations with this command:
+
+```bash
+curl https://docs.wal.app/setup/client_config.yaml -o ~/.config/walrus/client_config.yaml
+```
+
+Now execute this command to install the website builder.
+
+```rust
+SYSTEM= # set this to your system: ubuntu-x86_64, ubuntu-x86_64-generic, macos-x86_64, macos-arm64, windows-x86_64.exe
+curl https://storage.googleapis.com/mysten-walrus-binaries/site-builder-mainnet-latest-$SYSTEM -o site-builder
+chmod +x site-builder
+```
+
+You’ll also need to move the binary to any directory included in your $PATH environment variable. You can do that with this command:
+
+```rust
+sudo mv site-builder /usr/local/bin/
+```
+
+Once you’re set up, you should be able to use `site-builder` as a command in your terminal like this:
+
+```bash
+site-builder
+```
+
+If you encounter any issues, visit the [site builder installation page](https://docs.wal.app/walrus-sites/tutorial-install.html) for cues or ask the AI.
+
+### Deploying Your Walrus Site
+
+Regardless of the frontend framework you’re using, you can transpile into static files and build with Walrus.
+
+In this case, I’m going to deploy a Vitepress site, so I’ll need to build it with this command:
+
+```rust
+npm run build
+```
+
+Once you have your static files based on whatever frontend framework you’re using now, onto Walrus.
+
+You’ll need to download the latest Walrus configuration file. Execute this command for that:
+
+```rust
+mkdir -p ~/.config/walrus
+curl https://raw.githubusercontent.com/MystenLabs/walrus-sites/refs/heads/mainnet/sites-config.yaml -o ~/.config/walrus/sites-config.yaml
+```
+
+You should find  the file in your working directory. Here’s the path:
+
+```rust
+~/.config/walrus/sites-config.yaml
+```
+
+Now `site-builder` will automatically find it — you don't need to pass `--config` manually every time!
+
+Now execute this command to deploy the site
+
+```rust
+site-builder publish ./dist --epochs 1
+```
+
+The `./dist` is the folder with static files. `-epochs 1` means the site will live for at least 1 epoch (you can set more if you want)
+
+This should build the site and you’ll get some important data as output
+
+including Blob IDs created for each file, the **new Site Object ID** (important!) and the options you have to share your site.
+
+<img src="/deployed.png" alt="Site Deployed" />
+
+Congratulations, your site is **live on Walrus!**
+
+### Purchasing and Registering Domain Names
+
+You can [bring your existing domains](https://docs.wal.app/walrus-sites/bring-your-own-domain.html) to Walrus, or you can use the Sui name service to keep the entire system down to naming decentralized.
+
+Simply head over to the [Sui Name Service Website](http://suins.io) and buy a `.sui` domain for your project:
+
+<img src="/names.png" alt="Names you own" />
+
+After buying the domain, select one of the domain names you own and enter the site object ID like this:
+
+<img src="/suins.gif" alt="SuiNS GIF" />
+
+Once that’s done. Immediately visting the domain (your name).wal.app should
+
+### Conclusion
+
+You’ve learned how you can deploy a Walrus site and keep the domain name service decentralized by connecting it to a SuiNS domain.
+
+Next, learn how you can store your files on Walrus with the official TypeScript SDK.
+
+
+## Walrus TypeScript SDK Guide
+
+Walrus is undoutedly the best decentralized storage solution in the market right now by every metric. The developer tooling scene is also great.
+
+This article will walk you though interacting with the Walrus protocol. You’ll learn everything you’ll need  to start uploading and retrieving blobs and generally interacting with the Walrus protocol.
+
+### Getting Started with Walrus & TypeScript
+
+First, you’ll need to get set up with Walrus. I recommend installing via the CLI commands, especially if you’re on a Mac, because I ran into an issue trying to install it on my Mac.
+
+You will likely deploy your Walrus site on Mainnet, so execute this command to install the Walrus CLI tool and then the website builder for mainnet.
+
+Execute this command to install the latest Walrus mainnet version:
+
+```bash [Terminal]
+curl -sSf https://docs.wal.app/setup/walrus-install.sh | sh
+```
+
+You’ll need to add the `walrus` binary to your PATH. Also, you need to download the latest Walrus configurations with this command:
+
+```bash [Terminal]
+curl https://docs.wal.app/setup/client_config.yaml -o ~/.config/walrus/client_config.yaml
+```
+
+You just installed Walrus CLI in this case for the sole purpose of requesting test tokens.
+
+To request Walrus Testnet WAL tokens, make sure you have a Sui Testnet wallet with some SUI tokens. You can get some from the [\*\*Sui Testnet faucet](https://faucet.sui.io/?network=testnet).
+
+Now, execute this command in your terminal to exchange some SUI for WAL:
+
+```bash [Terminal]
+walrus get-wal
+```
+
+By default, this command exchanges 0.5 SUI for 0.5 WAL (Testnet tokens, both with no real value). You can specify a different amount using the `--amount` option, and a specific SUI/WAL exchange object with the `--exchange-id` option.
+
+For more options, run:
+
+```bash [Terminal]
+walrus get-wal --help
+```
+
+After running the command, you can check your balances with:
+
+```bash [Terminal]
+sui client balance
+```
+
+You should see both your SUI and WAL balances listed.
+
+Finally, install the Walrus and Sui TypeScript SDKs with this command:
+
+```bash [Terminal]
+npm install --save @mysten/walrus @mysten/sui
+```
+
+Now, you’re ready to start building with Walrus. The `get-wal` command is only available on Walrus testnet. On mainnet you’ll need to visit an exchange or use Slush Wallet to swap for some.
+
+### Writing Data to Walrus
+
+First, add these imports to the top of your file from the Sui and Walrus SDKs.
+
+```tsx [index.ts]
+import { getFullnodeUrl, SuiClient } from '@mysten/sui/client';
+import { WalrusClient, RetryableWalrusClientError } from '@mysten/walrus';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+
+```
+
+You’ll need to define Sui and Walrus clients respectively like this, and specify the networks:
+
+```tsx [index.ts]
+const suiClient = new SuiClient({
+    url: getFullnodeUrl('mainnet'),
+});
+
+const walrusClient = new WalrusClient({
+    network: 'mainnet',
+    suiClient,
+});
+```
+
+You’ll also need the keypair you’ve funded with SUI and WAL.
+
+```tsx [index.ts]
+const keypair = Ed25519Keypair.fromSecretKey(
+    '<KEY_PAIR>'
+);
+```
+
+Now, you can upload a file to Walrus with the `writeBlob` command. It takes in the blob and other configurations including if you want it deletable, the number of epochs you want to perisist the data for, and the signer.
+
+```tsx [index.ts]
+async function uploadPackageJson(path: string): Promise<string> {
+    const content = readFileSync(path, 'utf-8');
+    const fileBytes = new TextEncoder().encode(content);
+
+    const { blobId, blobObject } = await walrusClient.writeBlob({
+        blob: fileBytes,
+        deletable: true,
+        epochs: 3,
+        signer: keypair,
+    });
+
+    console.log(`Uploaded with blobId: ${blobId}`);
+    console.log(`Uploaded with blobObject: ${blobObject.id.id}`);
+    return blobId;
+}
+
+//
+
+(async () => {
+    const blobId = await uploadPackageJson('./package.json');
+})();
+
+```
+
+In this case, I’m uploading the `package.json` file in my project, and I’m logging the  blob ID  and object ID to the console. If your upload is complete, you should get the ID like this.
+
+<img src="/upload-blob.png" alt="Upload Blob" />
+
+### Reading Data From Walrus
+
+You’ll need the blob ID to read the file from Walrus network. Here’s how you can read it and save it to a path.
+
+```tsx [index.ts]
+import { writeFileSync } from 'fs';
+import { RetryableWalrusClientError, WalrusClient } from '@mysten/walrus';
+
+async function downloadPackageJson(blobId: string, outputPath: string): Promise<void> {
+    try {
+        const data = await walrusClient.readBlob({ blobId });
+        const json = new TextDecoder().decode(data);
+        writeFileSync(outputPath, json, 'utf-8');
+        console.log(`Downloaded and saved to ${outputPath}`);
+    } catch (error) {
+        if (error instanceof RetryableWalrusClientError) {
+            console.warn('Retryable error occurred. Resetting client and retrying...');
+            walrusClient.reset();
+            return downloadPackageJson(blobId, outputPath);
+        }
+        throw error;
+    }
+}
+
+(async () => {
+    await downloadPackageJson("guaJi9QLJOeoH8zZg11dtmbtWN4YmXRlDyxXCgMT5fo", './downloaded-package.json');
+})();
+```
+
+The **`readBlob`** function fetches the binary content from Walrus nodes. Then, **`TextDecoder().decode(...)`** converts the binary blob to a string, before **`writeFileSync`** saves it to a file.
+
+If a network or sync issue occurs (e.g., during epoch transition), the retry logic ensures you don’t crash on transient errors.
+
+<img src="/download-blob.png" alt="Download Blob" />
+
+### Deleting Data from Walrus
+
+Provided that you set the `deletable` option to true when you uploaded your blob to Walrus, you should be able to delete it from the  network with the `executeDeleteBlobTransaction` function like this:
+
+```tsx [index.ts]
+async function deleteBlobByObjectId(blobObjectId: string) {
+    try {
+        const { digest } = await walrusClient.executeDeleteBlobTransaction({
+            blobObjectId,
+            signer: keypair,
+        });
+
+        console.log(`✅ Blob deleted successfully. Transaction digest: ${digest}`);
+    } catch (err) {
+        if (err instanceof RetryableWalrusClientError) {
+            walrusClient.reset();
+            console.warn('⚠️ Retrying after client reset...');
+            const { digest } = await walrusClient.executeDeleteBlobTransaction({
+                blobObjectId,
+                signer: keypair,
+            });
+            console.log(`✅ Blob deleted after retry. Digest: ${digest}`);
+        } else {
+            console.error('❌ Failed to delete blob:', err);
+        }
+    }
+```
+
+In this case, you’ll use the Sui object ID during the function call to delete the object like this:
+
+```tsx [index.ts]
+deleteBlobByObjectId('0xac0988c339c5ec5c6b230f64e75b22a09457eff136e1e30fc3ce21412aa93ef6');
+```
+
+Here’s the output you should expect if you execute the function:
+
+<img src="/delete-blob.png" alt="Delete Blob" />
+
+### Conclusion
+
+You’ve learned how to install Walrus and do the basic functions of storage over the TypeScript client. Regardless of what you’re building now you can keep the entire stack decentralized.
+
