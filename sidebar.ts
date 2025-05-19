@@ -34,8 +34,8 @@ const sidebar = [
     {
         text: "Walrus Guides",
         items: [
-            { text: "Let's Deploy a Walrus Site", link: "/walrus-deploy" },
             { text: "Walrus TypeScript Tutorial", link: "/walrus-ts" },
+            { text: "Let's Deploy a Walrus Site", link: "/walrus-deploy" },
         ],
     },
     {
