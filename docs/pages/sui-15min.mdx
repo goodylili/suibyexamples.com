@@ -142,7 +142,7 @@ sui client publish --gas-budget 100000000
 
 It would verify the dependencies on-chain and publish the package. You would then get many useful transaction data, including the package ID and the transaction digest.
 
-![image.png](attachment:8aaed66d-dd8c-484c-973f-03fcd62e11ed:image.png)
+<img src="/published.png" alt="Example of Published Package"/>
 
 ## Move Modules
 
@@ -219,7 +219,7 @@ let mut <variable_name>[: <type>] = <expression>;
 
 :::info
 
-You can't create a `signer` manually. The system passes that in when someone calls your code.
+You can't create a `Transaction Context` manually. The system passes that in when someone calls your code.
 
 :::
 
@@ -346,6 +346,15 @@ let last_value = vector::pop_back(&mut nums);
 ```
 
 The `push_back` method adds an element to the end of the vector, and the `pop_back` method removes the last element.
+
+You also have to option to call the functions as if they were methods
+
+```move [sui.move]
+nums.push_back(4)
+let last_value = nums.pop_back()
+```
+
+This is just just syntactic sugar and is functionally equivalent to explicitly calling the library function.
 
 ## Collections
 
