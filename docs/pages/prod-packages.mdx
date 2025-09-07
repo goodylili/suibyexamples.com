@@ -8,7 +8,7 @@ In this article, you’ll learn the ergonomic aspects of Sui Move to write and p
 
 You can access the input arguments and the transaction context when anybody sends transactions to your contracts.
 
-You can use the context to fetch *who called it*, *when*, and *what’s happening*. That context is passed into your functions as `&mut TxContext`.
+You can use the context to fetch *who called it*, *when*, and *what’s happening*. That context is passed as the last argument into your functions as `&mut TxContext`.
 
 ```move [sui.move]
 public entry fun do_something(ctx: &mut TxContext) {
@@ -34,7 +34,7 @@ You’d often need to query what address is sending a transaction. Here’s how 
 
 ```move [sui.move]
 public entry fun mint(ctx: &mut TxContext) {
-    let owner = tx_context::sender(ctx);
+    let owner = ctx.sender();
 }
 ```
 
@@ -122,8 +122,8 @@ Blockchains use epochs to track time deterministically and Sui is no different.
 You can access epoch-related info from the transaction context:
 
 ```move [sui.move]
-let current_epoch = tx_context::epoch(ctx);
-let epoch_start_time = tx_context::epoch_timestamp_ms(ctx);
+let current_epoch = ctx.epoch();
+let epoch_start_time = ctx.epoch_timestamp_ms();
 ```
 
 You can also use the `Clock` module for For millisecond-level accuracy.
